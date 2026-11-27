@@ -211,9 +211,9 @@ def test_benchmark_profiles_top_level_functions_and_same_input(workspace):
     )
     workspace.solution = [sys.executable, "main.py", "argument"]
     original = source.read_bytes()
-    assert benchmark(workspace, sizes=[10], repeat=2, seed=3, profile=True) == 0
+    assert benchmark(workspace, sizes=[10], repeat=2, seed=3, slow_seconds=0.01, shrink=False) == 0
     session = latest_session(workspace, "bench")
-    target = session / "size-10-profile"
+    target = session / "size-10-slow" / "profile"
     baseline = session / "size-10-run-1"
     assert source.read_bytes() == original
     assert (baseline / "input.txt").read_bytes() == (target / "input.txt").read_bytes()
@@ -233,11 +233,11 @@ def test_benchmark_profiles_tle_and_saves_partial_rows(workspace):
     (workspace.root / "main.py").write_text("x = 0\nwhile True:\n    x += 1\n")
     workspace.timeout = 0.2
     assert (
-        benchmark(workspace, sizes=[10, 20], repeat=1, seed=3, profile=True, profile_timeout=0.2)
+        benchmark(workspace, sizes=[10, 20], repeat=1, seed=3, shrink=False, profile_timeout=0.2)
         == 1
     )
     session = latest_session(workspace, "bench")
-    target = session / "size-10-profile"
+    target = session / "size-10-timeout" / "profile"
     assert read_json(target / "profile-status.json")["partial"] is True
     assert read_json(target / "profile-status.json")["status"] == "timeout"
     with (target / "line-profile.csv").open(newline="") as stream:
@@ -252,7 +252,16 @@ def test_benchmark_profiles_tle_and_saves_partial_rows(workspace):
 def test_profile_timeout_does_not_change_normal_measurement(workspace):
     (workspace.root / "main.py").write_text("import time\ntime.sleep(0.2)\n")
     assert (
-        benchmark(workspace, sizes=[10], repeat=1, seed=3, profile=True, profile_timeout=0.05) == 2
+        benchmark(
+            workspace,
+            sizes=[10],
+            repeat=1,
+            seed=3,
+            slow_seconds=0.01,
+            shrink=False,
+            profile_timeout=0.05,
+        )
+        == 2
     )
     summary = read_json(latest_session(workspace, "bench") / "summary.json")
     assert summary["rows"][0]["status"] == "ok"

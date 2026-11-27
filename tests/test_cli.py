@@ -116,6 +116,10 @@ def test_invalid_url_is_rejected_without_creating_target(tmp_path: Path) -> None
         ("bench", "--sizes", "1,1"),
         ("bench", "--sizes", "0,1"),
         ("bench", "--repeat", "0"),
+        ("bench", "--memory-limit", "0"),
+        ("bench", "--slow-seconds", "nan"),
+        ("bench", "--shrink-budget", "0"),
+        ("bench", "--profile-timeout", "inf"),
     ],
 )
 def test_invalid_options_exit_two_before_execution(
@@ -234,3 +238,25 @@ def test_setup_error_does_not_require_writable_parent(tmp_path: Path) -> None:
     assert result.returncode == 2, result.stdout + result.stderr
     assert "atcoder.jp/contests" in result.stdout
     assert "Traceback" not in result.stderr
+
+
+def test_run_memory_limit_without_expected_output_reports_mle(tmp_path: Path) -> None:
+    assert invoke(tmp_path, "new", "problem").returncode == 0
+    root = tmp_path / "problem"
+    (root / "main.py").write_text(
+        "import time\nblocks = []\n"
+        "while True:\n"
+        "    blocks.append(bytearray(8 * 1024 * 1024))\n"
+        "    time.sleep(0.01)\n"
+    )
+    data = tmp_path / "input.txt"
+    data.write_text("1\n")
+    result = invoke(tmp_path, "run", "problem", "--input", str(data), "--memory-limit", "64")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "MLE" in result.stdout
+    assert "KeyError" not in result.stdout
+    session = next((root / ".ac" / "runs").glob("*-run-*"))
+    record = json.loads((session / "case" / "result.json").read_text())
+    assert record["verdict"] == "MLE"
+    assert record["solution"]["status"] == "memory_limit"
+    assert record["solution"]["max_rss_kib"] > 64 * 1024

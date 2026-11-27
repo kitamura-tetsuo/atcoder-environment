@@ -15,6 +15,8 @@ from pathlib import Path
 from threading import Event
 from typing import Any
 
+import psutil
+
 
 @dataclass(frozen=True)
 class RunResult:
@@ -47,13 +49,18 @@ def run_program(
     timeout: float = 2.0,
     output_limit: int = 1_048_576,
     cancel_event: Event | None = None,
+    memory_limit_mib: int | None = None,
 ) -> RunResult:
     """Run a program on POSIX with a wall deadline and combined output byte cap.
 
     Both output pipes share ``output_limit``; a program cannot evade the limit
     by switching between stdout and stderr. Streams are decoded as UTF-8 with
     replacement. This is a local test runner, not an untrusted-code sandbox.
-    RSS is unavailable rather than inferred from cumulative child statistics.
+    A memory limit enables resident-memory measurement for this execution. The
+    reported peak is sampled total RSS across its process tree; shared pages may
+    be counted for multiple processes, and short peaks may fall between samples.
+    Sampling starts after Popen has completed exec, avoiding inherited pre-exec
+    high-water marks. This is a best-effort guard, not a kernel allocation limit.
     Cancellation raises CancelledError after stopping the whole process group.
     """
     if os.name != "posix":
@@ -67,6 +74,10 @@ def run_program(
         raise ValueError("timeout must be a positive finite number")
     if isinstance(output_limit, bool) or not isinstance(output_limit, int) or output_limit <= 0:
         raise ValueError("output_limit must be a positive integer")
+    if memory_limit_mib is not None and (
+        type(memory_limit_mib) is not int or memory_limit_mib <= 0
+    ):
+        raise ValueError("memory_limit_mib must be a positive integer or None")
 
     if cancel_event is not None and cancel_event.is_set():
         raise CancelledError("Execution cancelled before launch")
@@ -104,6 +115,29 @@ def run_program(
     captured = 0
     forced_status: str | None = None
     cleanup_deadline: float | None = None
+    memory_limit_kib = memory_limit_mib * 1024 if memory_limit_mib is not None else None
+    max_rss_kib: int | None = None
+    observed_process: psutil.Process | None = None
+    next_memory_sample = 0.0
+
+    def sample_memory() -> None:
+        nonlocal max_rss_kib, observed_process
+        if memory_limit_kib is None:
+            return
+        try:
+            if observed_process is None:
+                observed_process = psutil.Process(process.pid)
+            members = [observed_process, *observed_process.children(recursive=True)]
+        except psutil.NoSuchProcess:
+            return
+        resident_bytes = 0
+        for member in members:
+            try:
+                resident_bytes += member.memory_info().rss
+            except psutil.NoSuchProcess:
+                # A process may exit between discovering it and sampling it.
+                continue
+        max_rss_kib = max(max_rss_kib or 0, (resident_bytes + 1023) // 1024)
 
     def close_stream(stream: Any) -> None:
         try:
@@ -133,8 +167,19 @@ def run_program(
         while True:
             if cancel_event is not None and cancel_event.is_set():
                 raise CancelledError("Execution cancelled")
-            returncode = process.poll()
             now = time.monotonic()
+            if memory_limit_kib is not None and now >= next_memory_sample:
+                sample_memory()
+                next_memory_sample = now + 0.01
+            returncode = process.poll()
+            if (
+                forced_status is None
+                and memory_limit_kib is not None
+                and max_rss_kib is not None
+                and max_rss_kib > memory_limit_kib
+            ):
+                forced_status = "memory_limit"
+                stop()
             if returncode is not None and cleanup_deadline is None:
                 # A successful parent may still have left background children.
                 stop()
@@ -146,7 +191,8 @@ def run_program(
             if cleanup_deadline is not None and now >= cleanup_deadline:
                 break
             active_deadline = cleanup_deadline if cleanup_deadline is not None else deadline
-            events = selector.select(min(0.05, max(0.0, active_deadline - now)))
+            poll_interval = 0.01 if memory_limit_kib is not None else 0.05
+            events = selector.select(min(poll_interval, max(0.0, active_deadline - now)))
             for key, _ in events:
                 stream = key.fileobj
                 if stream.closed:
@@ -206,6 +252,7 @@ def run_program(
         stderr=output["stderr"].decode("utf-8", errors="replace"),
         elapsed_seconds=time.monotonic() - started,
         status=status,
+        max_rss_kib=max_rss_kib,
     )
 
 
@@ -251,7 +298,12 @@ def verdict(
     rtol: float = 1e-9,
 ) -> str:
     """Translate execution status and output into a familiar judge verdict."""
-    failure = {"timeout": "TLE", "runtime_error": "RE", "output_limit": "OLE"}
+    failure = {
+        "timeout": "TLE",
+        "runtime_error": "RE",
+        "output_limit": "OLE",
+        "memory_limit": "MLE",
+    }
     if result.status in failure:
         return failure[result.status]
     if result.status != "ok" or result.returncode != 0:

@@ -7,6 +7,7 @@ Unsupported expressions are rejected instead of weakening the input constraints.
 from __future__ import annotations
 
 import json
+import math
 import random
 import re
 import tomllib
@@ -17,6 +18,20 @@ from typing import Any
 from hypothesis import strategies as st
 
 _IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_]*\Z")
+
+BENCHMARK_PATTERNS = (
+    "default",
+    "balanced",
+    "alternating",
+    "blocks",
+    "palette",
+    "distinct",
+    "sorted",
+    "reversed",
+    "random",
+    "constant",
+    "constant_max",
+)
 
 
 @dataclass(frozen=True)
@@ -155,12 +170,44 @@ class IntegerArrayConstraints:
                     cases.append(case)
         return cases
 
+    def benchmark_patterns(self, size: int) -> tuple[str, ...]:
+        """List feasible distributions spanning order, skew, and cardinality.
+
+        These are representative adversarial families, not a proof that every
+        possible solution's worst case is covered. Invalid families are omitted
+        instead of silently generating a different distribution.
+        """
+        self._validate_size(size)
+        lower, upper = self._bounds(size)
+        return tuple(
+            pattern
+            for pattern in BENCHMARK_PATTERNS
+            if not (pattern == "distinct" and upper - lower + 1 < size)
+            and not (pattern in {"constant", "constant_max"} and self.min_distinct > 1)
+        )
+
     def benchmark_case(self, size: int, seed: int, *, pattern: str = "default") -> list[int]:
-        """Build a reproducible input distribution within the official constraints."""
+        """Build a reproducible distribution within the official constraints."""
+        return self._benchmark_case(size, seed, pattern=pattern)
+
+    def _benchmark_case(
+        self,
+        size: int,
+        seed: int,
+        *,
+        pattern: str,
+        cardinality: int | None = None,
+        span: int | None = None,
+    ) -> list[int]:
         self._validate_size(size)
         if type(seed) is not int:
             raise ValueError("seed must be an integer, excluding booleans")
+        if pattern not in BENCHMARK_PATTERNS:
+            raise ValueError(f"Unknown benchmark pattern: {pattern}")
         lower, upper = self._bounds(size)
+        if span is not None:
+            upper = lower + span
+        width = upper - lower + 1
         rng = random.Random(seed)
         common, outlier = (lower, upper) if rng.randrange(2) == 0 else (upper, lower)
         if pattern == "default":
@@ -171,8 +218,25 @@ class IntegerArrayConstraints:
             values = [common] * (size // 2) + [outlier] * (size - size // 2)
         elif pattern == "alternating":
             values = [common if index % 2 == 0 else outlier for index in range(size)]
+        elif pattern in {"blocks", "palette", "sorted", "reversed"}:
+            maximum = min(size, width)
+            count = cardinality if cardinality is not None else maximum
+            if cardinality is None and pattern == "blocks":
+                count = min(maximum, max(2, math.isqrt(size)))
+            palette = (
+                [lower]
+                if count == 1
+                else [lower + index * (upper - lower) // (count - 1) for index in range(count)]
+            )
+            if pattern == "palette":
+                # A repeated high-cardinality cycle complements long equal runs.
+                values = [palette[index % count] for index in range(size)]
+            else:
+                values = [palette[index * count // size] for index in range(size)]
+                if pattern == "reversed":
+                    values.reverse()
         elif pattern == "distinct":
-            if upper - lower + 1 < size:
+            if width < size:
                 raise ValueError("The value range does not allow an all-distinct input")
             start = rng.randint(lower, upper - size + 1)
             values = list(range(start, start + size))
@@ -182,9 +246,60 @@ class IntegerArrayConstraints:
             if self.min_distinct == 2 and all(value == values[0] for value in values):
                 values[-1] = upper if values[0] != upper else lower
         else:
-            raise ValueError(f"Unknown benchmark pattern: {pattern}")
+            if self.min_distinct > 1:
+                raise ValueError(
+                    "A constant pattern violates the minimum distinct-value constraint"
+                )
+            values = [lower if pattern == "constant" else upper] * size
         self.validate_case(values)
         return values
+
+    def benchmark_strategy(
+        self, max_size: int, seed: int, *, pattern: str = "default", size_only: bool = False
+    ):
+        """Shrink resource cases using compact, full-size distribution parameters.
+
+        Drawing each element independently would exhaust Hypothesis's choice
+        budget at large N. Instead, shrink N, cardinality, value span, and a seed
+        offset before constructing the list. The unmodified distribution at the
+        original seed remains representable, including at max_size. A bounded
+        search need not rediscover it, so callers must retain the initial case.
+        A preliminary size_only pass preserves the measured seed and distribution.
+        """
+        self._validate_size(max_size)
+        if type(seed) is not int:
+            raise ValueError("seed must be an integer, excluding booleans")
+        if pattern not in self.benchmark_patterns(max_size):
+            raise ValueError(f"Benchmark pattern {pattern!r} is infeasible at size {max_size}")
+        if size_only:
+            return st.integers(self.size_min, max_size).map(
+                lambda size: self.benchmark_case(size, seed, pattern=pattern)
+            )
+
+        @st.composite
+        def cases(draw):
+            size = draw(st.integers(self.size_min, max_size))
+            lower, upper = self._bounds(size)
+            maximum = min(size, upper - lower + 1)
+            count = None
+            if pattern in {"blocks", "palette", "sorted", "reversed"}:
+                if pattern == "blocks":
+                    maximum = min(maximum, max(2, math.isqrt(size)))
+                count = draw(st.integers(self.min_distinct, maximum))
+            minimum_span = max(self.min_distinct - 1, (count or 1) - 1)
+            if pattern == "distinct":
+                minimum_span = size - 1
+            # Keep the shrinking target independent of N; drawing an absolute
+            # span with a moving lower bound can prevent all-distinct N shrinking.
+            span = minimum_span + draw(st.integers(0, upper - lower - minimum_span))
+            variant_seed = seed
+            if pattern in {"default", "balanced", "alternating", "distinct", "random"}:
+                variant_seed ^= draw(st.integers(0, 65_535))
+            return self._benchmark_case(
+                size, variant_seed, pattern=pattern, cardinality=count, span=span
+            )
+
+        return cases()
 
     def to_toml(self) -> str:
         """Return the complete versioned, human-editable constraints document."""

@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from hypothesis import find, given, settings
+from hypothesis import Phase, find, given, settings
 
 from atcoder_env.constraint_model import IntegerArrayConstraints
 
@@ -221,3 +221,139 @@ def test_distinct_pattern_requires_sufficient_domain():
     spec = IntegerArrayConstraints("N", 1, 10, "A", 1, 2)
     with pytest.raises(ValueError, match="all-distinct"):
         spec.benchmark_case(3, 0, pattern="distinct")
+
+
+def test_default_distribution_suite_covers_cardinality_order_and_skew():
+    patterns = DEPENDENT.benchmark_patterns(100)
+    assert set(patterns) == {
+        "default",
+        "balanced",
+        "alternating",
+        "blocks",
+        "palette",
+        "distinct",
+        "sorted",
+        "reversed",
+        "random",
+    }
+    cases = {
+        pattern: DEPENDENT.benchmark_case(100, seed=3, pattern=pattern) for pattern in patterns
+    }
+    assert sorted(cases["default"].count(value) for value in set(cases["default"])) == [1, 99]
+    assert sorted(cases["balanced"].count(value) for value in set(cases["balanced"])) == [50, 50]
+    assert len(set(cases["blocks"])) == 10
+    assert all(
+        cases["blocks"][index : index + 10].count(cases["blocks"][index]) == 10
+        for index in range(0, 100, 10)
+    )
+    assert len(set(cases["palette"])) == len(set(cases["distinct"])) == 100
+    assert cases["sorted"] == sorted(cases["sorted"])
+    assert cases["reversed"] == list(reversed(cases["sorted"]))
+    for case in cases.values():
+        DEPENDENT.validate_case(case)
+
+
+def test_narrow_domain_omits_impossible_families_and_uses_full_available_palette():
+    spec = IntegerArrayConstraints("N", 2, 100, "A", -4, -2, min_distinct=2)
+    patterns = spec.benchmark_patterns(50)
+    assert "distinct" not in patterns
+    assert not {"constant", "constant_max"}.intersection(patterns)
+    for pattern in patterns:
+        values = spec.benchmark_case(50, 8, pattern=pattern)
+        spec.validate_case(values)
+        if pattern in {"blocks", "palette", "sorted", "reversed"}:
+            assert set(values) == {-4, -3, -2}
+    assert "distinct" in spec.benchmark_patterns(2)
+
+
+def test_constant_families_cover_both_value_boundaries_when_valid():
+    spec = IntegerArrayConstraints("N", 1, 10, "A", -9, 10)
+    assert {"constant", "constant_max"}.issubset(spec.benchmark_patterns(10))
+    assert spec.benchmark_case(10, 3, pattern="constant") == [-9] * 10
+    assert spec.benchmark_case(10, 3, pattern="constant_max") == [10] * 10
+    with pytest.raises(ValueError, match="minimum distinct"):
+        DEPENDENT.benchmark_case(10, 3, pattern="constant")
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        DEPENDENT,
+        IntegerArrayConstraints("N", 1, 30, "A", -4, -2),
+        IntegerArrayConstraints("N", 2, 20, "A", "N", 25, min_distinct=2),
+        IntegerArrayConstraints("N", 1, 30, "A", "N", "N"),
+    ],
+)
+def test_compact_benchmark_strategies_preserve_all_modeled_constraints(spec):
+    maximum = min(30, spec.size_max)
+    for pattern in spec.benchmark_patterns(maximum):
+
+        @settings(max_examples=25, deadline=None, database=None)
+        @given(spec.benchmark_strategy(maximum, seed=5, pattern=pattern))
+        def check(values):
+            spec.validate_case(values)
+            assert spec.size_min <= len(values) <= maximum
+
+        check()
+
+
+@pytest.mark.parametrize("pattern", ["balanced", "blocks", "palette", "distinct", "random"])
+def test_benchmark_strategy_shrinks_beyond_small_stress_cap(pattern):
+    case = find(
+        DEPENDENT.benchmark_strategy(5000, seed=17, pattern=pattern),
+        lambda values: len(values) >= 100,
+        settings=settings(
+            max_examples=100, deadline=None, database=None, phases=(Phase.generate, Phase.shrink)
+        ),
+    )
+    assert len(case) == 100
+    assert len(case) > DEPENDENT.effective_stress_max_size
+    DEPENDENT.validate_case(case)
+
+
+def test_compact_strategy_generates_maximum_input_without_per_element_draw_budget():
+    spec = replace(DEPENDENT, size_min=300_000, stress_max_size=300_000)
+    case = find(
+        spec.benchmark_strategy(300_000, seed=5, pattern="distinct"),
+        lambda values: True,
+        settings=settings(
+            max_examples=10, deadline=None, database=None, phases=(Phase.generate, Phase.shrink)
+        ),
+    )
+    assert len(case) == len(set(case)) == 300_000
+    spec.validate_case(case)
+
+
+def test_benchmark_strategy_rejects_infeasible_family_and_invalid_maximum():
+    spec = IntegerArrayConstraints("N", 1, 100, "A", 1, 2)
+    with pytest.raises(ValueError, match="infeasible"):
+        spec.benchmark_strategy(100, 0, pattern="distinct")
+    with pytest.raises(ValueError, match="official range"):
+        DEPENDENT.benchmark_strategy(300_001, 0)
+    with pytest.raises(ValueError, match="infeasible"):
+        DEPENDENT.benchmark_strategy(100, 0, pattern="constant")
+
+
+def test_compact_strategy_can_shrink_cardinality_without_changing_size():
+    spec = replace(DEPENDENT, size_min=100, size_max=100, stress_max_size=100)
+    case = find(
+        spec.benchmark_strategy(100, 0, pattern="palette"),
+        lambda values: len(set(values)) >= 5,
+        settings=settings(
+            max_examples=100, deadline=None, database=None, phases=(Phase.generate, Phase.shrink)
+        ),
+    )
+    assert len(case) == 100
+    assert len(set(case)) == 5
+    assert set(case) == {1, 2, 3, 4, 5}
+
+
+def test_size_only_preliminary_strategy_preserves_measured_distribution_and_seed():
+    case = find(
+        DEPENDENT.benchmark_strategy(1000, 23, pattern="random", size_only=True),
+        lambda values: len(values) >= 100,
+        settings=settings(
+            max_examples=100, deadline=None, database=None, phases=(Phase.generate, Phase.shrink)
+        ),
+    )
+    assert case == DEPENDENT.benchmark_case(100, 23, pattern="random")

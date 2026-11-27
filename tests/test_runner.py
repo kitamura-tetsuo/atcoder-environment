@@ -230,3 +230,133 @@ def test_keyboard_interrupt_kills_process_group(
         for pid in pids:
             if is_running(pid):
                 os.kill(pid, signal.SIGKILL)
+
+
+def test_sampled_peak_memory_is_per_execution(tmp_path: Path) -> None:
+    large = run_python(
+        tmp_path,
+        "import time; data = bytearray(64 * 1024 * 1024); time.sleep(0.05); del data",
+        memory_limit_mib=256,
+    )
+    small = run_python(
+        tmp_path, "import time; print('small'); time.sleep(0.05)", memory_limit_mib=256
+    )
+    assert large.status == small.status == "ok"
+    assert large.max_rss_kib is not None and large.max_rss_kib >= 64 * 1024
+    assert small.max_rss_kib is not None and small.max_rss_kib > 0
+    assert large.max_rss_kib > small.max_rss_kib + 32 * 1024
+    assert small.to_dict()["max_rss_kib"] == small.max_rss_kib
+
+
+def test_large_launcher_memory_does_not_count_towards_child_limit(tmp_path: Path) -> None:
+    # A forked child's wait4 high-water mark may include this pre-exec memory.
+    parent_allocation = bytearray(160 * 1024 * 1024)
+    result = run_python(
+        tmp_path,
+        "import time; print('small'); time.sleep(0.05)",
+        memory_limit_mib=64,
+    )
+    assert len(parent_allocation) == 160 * 1024 * 1024
+    assert result.status == "ok"
+    assert result.stdout == "small\n"
+    assert result.max_rss_kib is not None and 0 < result.max_rss_kib < 64 * 1024
+
+
+def test_memory_limit_stops_growing_solution(tmp_path: Path) -> None:
+    result = run_python(
+        tmp_path,
+        "import time\n"
+        "data = []\n"
+        "for _ in range(20):\n"
+        "    data.append(bytearray(4 * 1024 * 1024))\n"
+        "    time.sleep(0.01)\n"
+        "time.sleep(20)\n",
+        timeout=3,
+        memory_limit_mib=32,
+    )
+    assert result.status == "memory_limit"
+    assert result.max_rss_kib is not None and result.max_rss_kib > 32 * 1024
+    assert result.elapsed_seconds < 3
+    assert verdict(result, "") == "MLE"
+
+
+def test_memory_limit_counts_children_and_stops_the_process_group(tmp_path: Path) -> None:
+    source = (
+        "import subprocess, sys, time\n"
+        "child = subprocess.Popen([sys.executable, '-c', "
+        "'import time; data = bytearray(64 * 1024 * 1024); time.sleep(20)'])\n"
+        "print(child.pid, flush=True)\n"
+        "time.sleep(20)\n"
+    )
+    result = run_python(tmp_path, source, timeout=3, memory_limit_mib=48)
+    child_pid = int(result.stdout.strip())
+    try:
+        assert result.status == "memory_limit"
+        assert result.max_rss_kib is not None and result.max_rss_kib > 48 * 1024
+        assert result.elapsed_seconds < 3
+        deadline = time.monotonic() + 1
+        while is_running(child_pid) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert not is_running(child_pid)
+    finally:
+        if is_running(child_pid):
+            os.kill(child_pid, signal.SIGKILL)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "raise MemoryError('explicit error')",
+        "import os, signal; os.kill(os.getpid(), signal.SIGKILL)",
+    ],
+)
+def test_unobserved_memory_failure_is_not_guessed_from_exit_status(
+    tmp_path: Path, source: str
+) -> None:
+    result = run_python(tmp_path, source, memory_limit_mib=256)
+    assert result.status == "runtime_error"
+    assert verdict(result, "") == "RE"
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 1.5, float("nan"), float("inf")])
+def test_invalid_memory_limits_are_rejected(tmp_path: Path, limit: object) -> None:
+    with pytest.raises(ValueError, match="memory_limit_mib"):
+        run_python(tmp_path, "", memory_limit_mib=limit)
+
+
+def test_memory_monitor_preserves_thread_cancellation(tmp_path: Path) -> None:
+    from concurrent.futures import CancelledError, ThreadPoolExecutor
+    from threading import Event
+
+    event = Event()
+    pid_file = tmp_path / "memory-worker.pid"
+    source = (
+        "import os, pathlib, time\n"
+        "pathlib.Path('memory-worker.pid').write_text(str(os.getpid()))\n"
+        "time.sleep(20)\n"
+    )
+    pid = None
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                run_python,
+                tmp_path,
+                source,
+                memory_limit_mib=256,
+                cancel_event=event,
+                timeout=5,
+            )
+            deadline = time.monotonic() + 3
+            while not pid_file.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            if pid_file.exists():
+                pid = int(pid_file.read_text())
+            event.set()
+            with pytest.raises(CancelledError):
+                future.result(timeout=3)
+        assert pid is not None
+        assert not is_running(pid)
+    finally:
+        event.set()
+        if pid is not None and is_running(pid):
+            os.kill(pid, signal.SIGKILL)
