@@ -62,6 +62,7 @@ def new_session(config: Config, kind: str) -> Path:
                 for name in (
                     "atcoder-environment",
                     "hypothesis",
+                    "line-profiler",
                     "cyaron",
                     "online-judge-tools",
                     "online-judge-template-generator",

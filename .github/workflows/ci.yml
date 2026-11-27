@@ -73,7 +73,7 @@ jobs:
           docker compose run --rm -T dev ac doctor
           docker compose run --rm -T dev ac test examples/pair-sum
           docker compose run --rm -T dev ac stress examples/pair-sum --max-examples 100 --seed 42
-          docker compose run --rm -T dev ac bench examples/pair-sum --sizes 100,1000,10000 --repeat 2
+          docker compose run --rm -T dev ac bench examples/pair-sum --sizes 100,1000,10000 --repeat 2 --profile
       - name: Verify container failure exit code
         shell: bash
         run: |

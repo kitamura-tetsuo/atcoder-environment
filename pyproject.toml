@@ -4,13 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "atcoder-environment"
-version = "0.3.0"
+version = "0.4.0"
 description = "A Python AtCoder workspace with reproducible local judging and shrinking"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = "Apache-2.0"
 dependencies = [
   "loguru==0.7.3",
+  "line-profiler==5.0.0",
   "hypothesis==6.170.17",
   "cyaron==0.7.0",
   "online-judge-tools==11.5.1",

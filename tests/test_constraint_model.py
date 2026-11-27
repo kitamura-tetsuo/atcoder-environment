@@ -200,3 +200,24 @@ def test_toml_round_trip_preserves_constants_symbols_and_escaped_strings(tmp_pat
 def test_toml_loader_never_ignores_unsupported_constraints(tmp_path, mutate):
     with pytest.raises(ValueError):
         IntegerArrayConstraints.from_toml(write_constraints(tmp_path, mutate(DEPENDENT.to_toml())))
+
+
+@pytest.mark.parametrize("pattern", ["balanced", "alternating", "distinct", "random"])
+@pytest.mark.parametrize("size", [2, 3, 1000])
+def test_benchmark_patterns_are_valid_and_reproducible(pattern, size):
+    values = DEPENDENT.benchmark_case(size, seed=5, pattern=pattern)
+    assert len(values) == size
+    assert_valid_dependent(values)
+    assert values == DEPENDENT.benchmark_case(size, seed=5, pattern=pattern)
+    if pattern in {"balanced", "alternating"}:
+        assert sorted(values.count(x) for x in set(values)) == [size // 2, size - size // 2]
+    if pattern == "alternating":
+        assert all(a != b for a, b in zip(values, values[1:], strict=False))
+    if pattern == "distinct":
+        assert len(set(values)) == size
+
+
+def test_distinct_pattern_requires_sufficient_domain():
+    spec = IntegerArrayConstraints("N", 1, 10, "A", 1, 2)
+    with pytest.raises(ValueError, match="all-distinct"):
+        spec.benchmark_case(3, 0, pattern="distinct")

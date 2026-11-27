@@ -131,6 +131,19 @@ def build_parser() -> argparse.ArgumentParser:
     bench.add_argument("--sizes", type=sizes_list, default=[100, 1000, 10000])
     bench.add_argument("--repeat", type=positive_int, default=3)
     bench.add_argument("--seed", type=int)
+    bench.add_argument(
+        "--pattern",
+        choices=("default", "balanced", "alternating", "distinct", "random"),
+        default="default",
+        help="Input distribution for automatically imported integer arrays",
+    )
+    bench.add_argument("--profile", action="store_true", help="Profile each measured input by line")
+    bench.add_argument(
+        "--profile-timeout",
+        type=positive_float,
+        default=10.0,
+        help="Separate profiling time budget in seconds (default: 10)",
+    )
     run = problem_command(
         "run", "Run one input and save stdout, stderr, timing, and status", run_options=True
     )
@@ -171,6 +184,7 @@ def doctor() -> int:
     for package in (
         "atcoder-environment",
         "hypothesis",
+        "line-profiler",
         "cyaron",
         "loguru",
         "online-judge-tools",
@@ -279,6 +293,9 @@ def main(argv: list[str] | None = None) -> int:
                 sizes=args.sizes,
                 repeat=args.repeat,
                 seed=args.seed if args.seed is not None else config.seed,
+                pattern=args.pattern,
+                profile=args.profile,
+                profile_timeout=args.profile_timeout,
             )
         if args.action == "run":
             return run_input(config, args.input, expected_path=args.expected)

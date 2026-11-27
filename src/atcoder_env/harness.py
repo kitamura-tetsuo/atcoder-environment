@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import csv
 import importlib.util
+import inspect
+import json
 import random
 import re
+import shutil
 import statistics
 import sys
 import time
@@ -369,15 +372,97 @@ def promote(config: Config, artifact: Path, name: str) -> int:
     return 0
 
 
-def benchmark(config: Config, *, sizes: list[int], repeat: int, seed: int) -> int:
+def _profile_command(config: Config) -> list[str]:
+    command = config.solution
+    interpreter = shutil.which(command[0])
+    if (
+        interpreter is None
+        or Path(interpreter).resolve() != Path(sys.executable).resolve()
+        or len(command) < 2
+        or command[1].startswith("-")
+        or not command[1].endswith(".py")
+        or not (config.root / command[1]).is_file()
+    ):
+        raise ValueError("--profile requires a direct Python script using the ac interpreter")
+    return command[1:]
+
+
+def _profile_benchmark(
+    config: Config, session: Path, size: int, data: str, timeout: float, script: list[str]
+) -> str:
+    name = f"size-{size}-profile"
+    target = session / name
+    target.mkdir()
+    result = run_program(
+        [
+            sys.executable,
+            "-m",
+            "atcoder_env.line_profile",
+            str(target),
+            str(timeout),
+            *script,
+        ],
+        data,
+        cwd=config.root,
+        timeout=timeout + 2.0,
+        output_limit=config.output_limit,
+    )
+    report = target / "profile-status.json"
+    status = result.status
+    if report.is_file():
+        status = json.loads(report.read_text(encoding="utf-8"))["status"]
+        if status == "ok" and result.status != "ok":
+            status = result.status
+    elif status == "ok":
+        status = "missing_report"
+    save_case(session, name, input_data=data, actual=result, verdict=status)
+    csv_path = target / "line-profile.csv"
+    if csv_path.is_file():
+        logger.info("n={}: line profile ({}) {}", size, status, csv_path)
+        with csv_path.open(encoding="utf-8", newline="") as handle:
+            for row in list(csv.DictReader(handle))[:5]:
+                logger.info(
+                    "  {}:{} {} hits={} time={:.6f}s | {}",
+                    Path(row["file"]).name,
+                    row["line"],
+                    row["function"],
+                    row["hits"],
+                    float(row["seconds"]),
+                    row["source"].strip(),
+                )
+    if status != "ok":
+        logger.warning("n={}: profiling {} (separate from benchmark verdict)", size, status)
+    return status
+
+
+def benchmark(
+    config: Config,
+    *,
+    sizes: list[int],
+    repeat: int,
+    seed: int,
+    pattern: str = "default",
+    profile: bool = False,
+    profile_timeout: float = 10.0,
+) -> int:
+    script = _profile_command(config) if profile else None
     session = new_session(config, "bench")
     rows = []
     failed = False
+    profile_failed = False
     with case_module(config.root) as module:
-        if not callable(getattr(module, "benchmark_case", None)):
+        generator = getattr(module, "benchmark_case", None)
+        if not callable(generator):
             raise ValueError("cases.py must define benchmark_case(size, seed)")
+        if pattern != "default" and "pattern" not in inspect.signature(generator).parameters:
+            raise ValueError("This cases.py does not support --pattern; add a pattern parameter")
         for size in sizes:
-            data = serialized(module, module.benchmark_case(size, seed))
+            case = (
+                generator(size, seed)
+                if pattern == "default"
+                else generator(size, seed, pattern=pattern)
+            )
+            data = serialized(module, case)
             results = []
             for attempt in range(repeat):
                 result = execute(config, data)
@@ -389,7 +474,7 @@ def benchmark(config: Config, *, sizes: list[int], repeat: int, seed: int) -> in
                     input_data=data,
                     actual=result,
                     verdict=status,
-                    details={"size": size, "seed": seed},
+                    details={"size": size, "seed": seed, "pattern": pattern},
                 )
                 if result.status != "ok":
                     failed = True
@@ -403,11 +488,22 @@ def benchmark(config: Config, *, sizes: list[int], repeat: int, seed: int) -> in
                 "max_seconds": max(times),
                 "status": results[-1].status,
                 "input_bytes": len(data.encode("utf-8")),
+                "pattern": pattern,
             }
             rows.append(row)
             logger.info(
                 "n={}: median={:.4f}s, status={}", size, row["median_seconds"], row["status"]
             )
+            if script is not None:
+                row["profile_status"] = _profile_benchmark(
+                    config,
+                    session,
+                    size,
+                    data,
+                    profile_timeout,
+                    script,
+                )
+                profile_failed |= row["profile_status"] != "ok"
             if failed:
                 logger.warning("Stopping at failed size; larger sizes were not executed")
                 break
@@ -415,6 +511,16 @@ def benchmark(config: Config, *, sizes: list[int], repeat: int, seed: int) -> in
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
-    write_json(session / "summary.json", {"seed": seed, "rows": rows, "checks_correctness": False})
+    write_json(
+        session / "summary.json",
+        {
+            "seed": seed,
+            "rows": rows,
+            "checks_correctness": False,
+            "pattern": pattern,
+            "profile": profile,
+            "profile_timeout": profile_timeout if profile else None,
+        },
+    )
     logger.info("Measurements: {}", session / "benchmark.csv")
-    return int(failed)
+    return 1 if failed else 2 if profile_failed else 0

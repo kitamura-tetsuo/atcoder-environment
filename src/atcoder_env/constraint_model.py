@@ -155,21 +155,34 @@ class IntegerArrayConstraints:
                     cases.append(case)
         return cases
 
-    def benchmark_case(self, size: int, seed: int) -> list[int]:
-        """Build a seeded long-run input with a boundary-valued outlier.
-
-        Unlike independent uniform draws, this deliberately retains long equal
-        runs that can expose expensive repeated scans in array algorithms.
-        """
+    def benchmark_case(self, size: int, seed: int, *, pattern: str = "default") -> list[int]:
+        """Build a reproducible input distribution within the official constraints."""
         self._validate_size(size)
         if type(seed) is not int:
             raise ValueError("seed must be an integer, excluding booleans")
         lower, upper = self._bounds(size)
         rng = random.Random(seed)
         common, outlier = (lower, upper) if rng.randrange(2) == 0 else (upper, lower)
-        values = [common] * size
-        if size > 1 and common != outlier:
-            values[rng.choice((0, size // 2, size - 1))] = outlier
+        if pattern == "default":
+            values = [common] * size
+            if size > 1 and common != outlier:
+                values[rng.choice((0, size // 2, size - 1))] = outlier
+        elif pattern == "balanced":
+            values = [common] * (size // 2) + [outlier] * (size - size // 2)
+        elif pattern == "alternating":
+            values = [common if index % 2 == 0 else outlier for index in range(size)]
+        elif pattern == "distinct":
+            if upper - lower + 1 < size:
+                raise ValueError("The value range does not allow an all-distinct input")
+            start = rng.randint(lower, upper - size + 1)
+            values = list(range(start, start + size))
+            rng.shuffle(values)
+        elif pattern == "random":
+            values = [rng.randint(lower, upper) for _ in range(size)]
+            if self.min_distinct == 2 and all(value == values[0] for value in values):
+                values[-1] = upper if values[0] != upper else lower
+        else:
+            raise ValueError(f"Unknown benchmark pattern: {pattern}")
         self.validate_case(values)
         return values
 
