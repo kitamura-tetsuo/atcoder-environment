@@ -107,15 +107,30 @@ def test_explicit_sizes_override_defaults_and_preserve_requested_order(
     assert [int(row["size"]) for row in rows if row["pattern"] == "default"] == [1_000, 2, 100]
 
 
-def test_out_of_range_size_fails_before_any_generator_solution_or_session(
+def test_out_of_range_manual_size_warns_and_executes_generated_case(
     tmp_path: Path, generated_problem: Path
 ):
-    forbid_execution(generated_problem)
-    result = invoke(tmp_path, "bench", URL, "--sizes", "2,300001", "--repeat", "1")
-    assert result.returncode == 2, result.stdout + result.stderr
-    assert "outside the official N range 2..300000" in result.stdout
-    assert not (generated_problem / "executed").exists()
-    assert not (generated_problem / ".ac" / "runs").exists()
+    result = invoke(
+        tmp_path,
+        "bench",
+        URL,
+        "--sizes",
+        "300001",
+        "--pattern",
+        "default",
+        "--repeat",
+        "1",
+        "--no-profile",
+        "--no-shrink",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Benchmark size 300001 is outside the official N range 2..300000" in result.stdout
+    session, rows = measurements(generated_problem)
+    assert [(int(row["size"]), row["status"]) for row in rows] == [(300001, "ok")]
+    contents = (session / "size-300001-run-1" / "input.txt").read_text().split()
+    assert len(contents) == 300002
+    assert contents[0] == "300001"
+    assert (session / "size-300001-run-1" / "actual.txt").read_text() == "300001\n"
 
 
 def test_missing_constraints_support_custom_generator_with_legacy_defaults(
