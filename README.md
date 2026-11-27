@@ -89,6 +89,16 @@ EOF
 
 タスクは `uv run --frozen ac ...` を呼ぶため、ホスト側でuvをセットアップした場合にも使えます。問題ディレクトリーを尋ねられたら、まず `examples/pair-sum` を指定してください。
 
+### VS Code のブレークポイントでデバッグする
+
+1. 対象問題の `main.py` をエディターで開き、停止したい行にブレークポイントを置きます。
+2. 「実行とデバッグ」（Ctrl+Shift+D）で **AtCoder: Debug Test (oj)** を選び、F5 を押します。
+3. `test/` のサンプル・回帰テストが順に実行され、各解答プロセスでブレークポイントに停止します。変数の確認、ステップ実行、続行（F5）ができます。
+
+以前の練習環境と同じ online-judge-tools と VS Code Python Debugger（debugpy）の subprocess 機能を使用します。`judge.py` がある場合は対話型ジャッジを優先します。`main.py` 単体を実行したい場合は **Python Debugger: Current File** を選びます。
+
+Dev Container では設定済みの `/opt/venv/bin/python`、ローカルでは `uv sync --frozen` 後に **Python: Select Interpreter** で `.venv/bin/python` を選んでください。デバッグは oj の判定を用い、ブレークポイントで停止できるよう ac の時間・メモリ制限を適用しません。実行時間の測定や ac のログ保存は通常の `ac test` / `ac bench` で行ってください。
+
 ## Dockerを使わない場合
 
 Linux/macOS、Python 3.11〜3.13、[uv](https://docs.astral.sh/uv/getting-started/installation/) が必要です。標準はPython 3.12です。
