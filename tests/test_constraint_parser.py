@@ -263,3 +263,185 @@ def test_invalid_stress_caps_are_reported(cap: object) -> None:
     result = analyze_statement(statement(), URL, max_size=cap)
     assert result.spec is None
     assert result.unsupported
+
+
+def string_statement(
+    *,
+    size: str = "3 <= N <= 300000",
+    string_clause: str = "S is a string of length N consisting of A, B, and C.",
+    integer_clause: str = "N is an integer.",
+    input_format: str = "N\nS\n",
+    extras: tuple[str, ...] = (),
+) -> bytes:
+    return statement(
+        size=size,
+        values=string_clause,
+        integer_clause=integer_clause,
+        input_format=input_format,
+        extras=extras,
+    )
+
+
+def test_exact_abc485d_constraints_create_a_string_model() -> None:
+    from atcoder_env.string_constraints import StringConstraints
+
+    url = "https://atcoder.jp/contests/abc485/tasks/abc485_d"
+    fixture = FIXTURE.with_name("abc485_d_constraints.html")
+    result = analyze_statement(fixture.read_bytes(), url)
+    assert result.unsupported == []
+    assert len(result.constraints) == len(result.recognized) == 3
+    spec = result.spec
+    assert isinstance(spec, StringConstraints)
+    assert (spec.size_name, spec.size_min, spec.size_max) == ("N", 3, 300000)
+    assert spec.string_name == "S"
+    assert spec.alphabet == "ABC"
+    assert spec.stress_max_size == 30
+    assert spec.url == url
+    for case in spec.edge_cases():
+        size, value = spec.serialize(case).splitlines()
+        assert int(size) == len(value)
+        assert 3 <= len(value) <= 30
+        assert set(value) <= set("ABC")
+
+
+def test_string_variables_and_alphabet_are_taken_from_the_statement() -> None:
+    result = analyze_statement(
+        string_statement(
+            size="1 < M < 9",
+            string_clause="T is a string of length M consisting of x, y and z.",
+            integer_clause="M is an integer.",
+            input_format="M\nT\n",
+        ),
+        URL,
+    )
+    assert result.spec is not None, result.unsupported
+    assert (result.spec.size_name, result.spec.size_min, result.spec.size_max) == ("M", 2, 8)
+    assert result.spec.string_name == "T"
+    assert result.spec.alphabet == "xyz"
+
+
+@pytest.mark.parametrize(
+    ("alphabet_clause", "alphabet"),
+    [
+        ("A , B , and C", "ABC"),
+        ("A, B and C", "ABC"),
+        ("A, B, C", "ABC"),
+        ("A and B", "AB"),
+        ("A", "A"),
+        ("`0` and `1`", "01"),
+        ("'#' and '.'", "#."),
+        ('"x", "y", and "z"', "xyz"),
+        ("'~', '\\', and '*'", "~\\*"),
+        ("',' and '.'", ",."),
+    ],
+)
+def test_literal_alphabets_are_fully_consumed_and_preserved(
+    alphabet_clause: str, alphabet: str
+) -> None:
+    result = analyze_statement(
+        string_statement(
+            string_clause=f"S is a string of length N consisting of {alphabet_clause}."
+        ),
+        URL,
+    )
+    assert result.spec is not None, result.unsupported
+    assert result.spec.alphabet == alphabet
+
+
+@pytest.mark.parametrize(
+    "clause",
+    [
+        "S is a string of length M consisting of A, B, and C.",
+        "S is a string of length N+1 consisting of A, B, and C.",
+        "S is a string of length 2N consisting of A, B, and C.",
+        "T is a string of length N consisting of A, B, and C.",
+        "S is a string consisting of A, B, and C.",
+        "S is a string of length N consisting of lowercase English letters.",
+        "S is a string of length N consisting of ABC.",
+        "S is a string of length N consisting of 'ABC'.",
+        "S is a string of length N consisting of A-Z.",
+        "S is a string of length N consisting of .",
+        "S is a string of length N consisting of A, B, .",
+        "S is a string of length N consisting of A and B and C.",
+        "S is a string of length N consisting of A, B, or C.",
+        "S is a string of length N consisting of A, A, and C.",
+        "S is a string of length N consisting of α and β.",
+        "S is a string of length N consisting of `−`.",
+        "S is a string of length N consisting of A, B, and C. S contains A.",
+        "S is a string of length N consisting of A, B, and C, with at least two distinct characters.",
+    ],
+)
+def test_unsupported_string_length_alphabet_or_extra_prose_fails_closed(clause: str) -> None:
+    result = analyze_statement(string_statement(string_clause=clause), URL)
+    assert result.spec is None
+    assert result.unsupported
+    assert any(clause in reason for reason in result.unsupported)
+
+
+@pytest.mark.parametrize(
+    "input_format",
+    [
+        "N S\n",
+        "N\nS\nT\n",
+        "N\nS_1\n",
+        "N\nS_1 S_2 \\ldots S_N\n",
+        "S\nN\n",
+        "N\nN\n",
+    ],
+)
+def test_string_constraints_require_the_declared_two_scalar_input_shape(input_format: str) -> None:
+    result = analyze_statement(string_statement(input_format=input_format), URL)
+    assert result.spec is None
+    assert result.unsupported
+
+
+@pytest.mark.parametrize(
+    "integer_clause",
+    [
+        "",
+        "M is an integer.",
+        "N is a real number.",
+        "All input values are integers.",
+        "N is an integer. N is even.",
+    ],
+)
+def test_string_length_type_requires_its_own_complete_integer_declaration(
+    integer_clause: str,
+) -> None:
+    result = analyze_statement(string_statement(integer_clause=integer_clause), URL)
+    assert result.spec is None
+    assert any("declaring N to be an integer" in reason for reason in result.unsupported)
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        "S contains at least one A.",
+        "S is a palindrome.",
+        "N is odd.",
+        "1 <= S_i <= N",
+        "S is a string of length N consisting of A and B.",
+    ],
+)
+def test_additional_string_conditions_block_a_partial_generator(condition: str) -> None:
+    result = analyze_statement(string_statement(extras=(condition,)), URL)
+    assert result.spec is None
+    assert any(condition in reason for reason in result.unsupported)
+    assert len(result.recognized) == 3
+
+
+@pytest.mark.parametrize("size", ["N <= 10", "3 <= N", "3 <= N <= M", "4 <= N <= 2"])
+def test_string_length_bounds_are_required_and_must_be_representable(size: str) -> None:
+    result = analyze_statement(string_statement(size=size), URL)
+    assert result.spec is None
+    assert result.unsupported
+
+
+def test_string_alphabet_is_not_inferred_from_sample_input() -> None:
+    source = string_statement(string_clause="").replace(
+        b"</span>",
+        b"<section><h3>Sample Input 1</h3><pre>3\nABC\n</pre></section></span>",
+    )
+    result = analyze_statement(source, URL)
+    assert result.spec is None
+    assert any("literal alphabet declaration" in reason for reason in result.unsupported)

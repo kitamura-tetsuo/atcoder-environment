@@ -21,6 +21,7 @@ from onlinejudge_template.types import ItemNode, LoopNode, NewlineNode, Sequence
 from sympy.parsing.latex import parse_latex
 
 from atcoder_env.constraint_model import IntegerArrayConstraints
+from atcoder_env.string_constraints import StringConstraints
 
 MAX_VALUE = 10**18
 MAX_EXPRESSION_LENGTH = 256
@@ -36,7 +37,7 @@ _INTEGER_CLAUSE = re.compile(
 
 @dataclass(frozen=True)
 class ConstraintAnalysis:
-    spec: IntegerArrayConstraints | None
+    spec: IntegerArrayConstraints | StringConstraints | None
     input_format: str | None
     constraints: list[str]
     recognized: list[str]
@@ -182,7 +183,7 @@ def _endpoint(
     return result
 
 
-def _input_shape(input_format: str) -> tuple[str, str]:
+def _input_shape(input_format: str) -> tuple[str, str, str]:
     try:
         tree = oj_parser.run(input_format)
         declared = oj_variables.list_declared_variables(tree)
@@ -190,19 +191,29 @@ def _input_shape(input_format: str) -> tuple[str, str]:
         raise UnsupportedConstraint(
             "Existing oj-template parser could not parse the input format"
         ) from error
+    shape_error = "Input must be a size line followed by exactly one array or string line"
     if not isinstance(tree, SequenceNode) or len(tree.items) != 4:
-        raise UnsupportedConstraint("Input must be a size line followed by exactly one array line")
-    scalar, first_newline, loop, last_newline = tree.items
+        raise UnsupportedConstraint(shape_error)
+    scalar, first_newline, payload, last_newline = tree.items
     if not (
         isinstance(scalar, ItemNode)
         and not scalar.indices
         and isinstance(first_newline, NewlineNode)
-        and isinstance(loop, LoopNode)
-        and isinstance(loop.body, ItemNode)
-        and len(loop.body.indices) == 1
         and isinstance(last_newline, NewlineNode)
     ):
-        raise UnsupportedConstraint("Input must be a size line followed by exactly one array line")
+        raise UnsupportedConstraint(shape_error)
+    if isinstance(payload, ItemNode) and not payload.indices:
+        size_name, string_name = str(scalar.name), str(payload.name)
+        if size_name == string_name or set(declared) != {size_name, string_name}:
+            raise UnsupportedConstraint("Input must declare one size and one separate string")
+        return size_name, string_name, "string"
+    loop = payload
+    if not (
+        isinstance(loop, LoopNode)
+        and isinstance(loop.body, ItemNode)
+        and len(loop.body.indices) == 1
+    ):
+        raise UnsupportedConstraint(shape_error)
     size_name, values_name = str(scalar.name), str(loop.body.name)
     if size_name == values_name or set(declared) != {size_name, values_name}:
         raise UnsupportedConstraint("Input must declare one size and one separate array")
@@ -214,7 +225,7 @@ def _input_shape(input_format: str) -> tuple[str, str]:
         or set(array.depending) != {size_name}
     ):
         raise UnsupportedConstraint("Only an exactly size-long, one-based array is supported")
-    return size_name, values_name
+    return size_name, values_name, "array"
 
 
 def _clauses(section: Tag) -> list[str]:
@@ -386,6 +397,111 @@ def _combined_bound(
     )
 
 
+def _literal_alphabet(text: str) -> str:
+    """Consume an explicit enumeration of single printable ASCII characters."""
+    atom = re.compile(r"""`([^\s`])`|'([^\s'])'|"([^\s"])"|([^\s,.'"`])""")
+    characters: list[str] = []
+    remaining = text.strip()
+    final_character = False
+    while True:
+        match = atom.match(remaining)
+        if match is None:
+            raise UnsupportedConstraint("String alphabet must list individual literal characters")
+        character = next(group for group in match.groups() if group is not None)
+        if not character.isascii() or not character.isprintable():
+            raise UnsupportedConstraint("Only printable ASCII string alphabets are supported")
+        characters.append(character)
+        remaining = remaining[match.end() :].lstrip()
+        if not remaining:
+            break
+        if final_character:
+            raise UnsupportedConstraint("Unexpected text after the final alphabet character")
+        separator = re.match(r",\s*(?:(and)\s+)?|(and)\s+", remaining, re.IGNORECASE)
+        if separator is None:
+            raise UnsupportedConstraint("String alphabet must be a complete literal enumeration")
+        final_character = any(group is not None for group in separator.groups())
+        remaining = remaining[separator.end() :]
+    if len(set(characters)) != len(characters):
+        raise UnsupportedConstraint("String alphabet contains duplicate characters")
+    return "".join(characters)
+
+
+def _string_clause(text: str, size_name: str, string_name: str) -> str | None:
+    match = re.fullmatch(
+        r"([A-Za-z][A-Za-z0-9_]*) (?i:is a string of length) (.+?) "
+        r"(?i:consisting of) (.+?)\s*\.?",
+        " ".join(text.split()),
+    )
+    if match is None:
+        return None
+    if match[1] != string_name:
+        raise UnsupportedConstraint("String clause does not name the declared input string")
+    if match[2].strip() != size_name:
+        raise UnsupportedConstraint("String length must be exactly the declared size variable")
+    return _literal_alphabet(match[3])
+
+
+def _string_spec(
+    constraints: list[str],
+    recognized: list[str],
+    unsupported: list[str],
+    *,
+    size_name: str,
+    string_name: str,
+    max_size: int,
+    url: str,
+) -> StringConstraints | None:
+    bounds: dict[str, list[int]] = {"lower": [], "upper": []}
+    integer_size = False
+    alphabet = None
+    for clause in constraints:
+        try:
+            if re.fullmatch(
+                re.escape(size_name) + r" (?i:is an integer)\s*\.?", _normalize(clause)
+            ):
+                integer_size = True
+            else:
+                declared_alphabet = _string_clause(clause, size_name, string_name)
+                if declared_alphabet is not None:
+                    if alphabet is not None and set(alphabet) != set(declared_alphabet):
+                        raise UnsupportedConstraint("Conflicting string alphabet declarations")
+                    alphabet = declared_alphabet
+                else:
+                    updates = _bound_clause(clause, size_name, string_name)
+                    if any(target != "size" for target, _, _ in updates):
+                        raise UnsupportedConstraint(
+                            "String input format cannot use integer-array element constraints"
+                        )
+                    for _, side, endpoint in updates:
+                        assert isinstance(endpoint, int)
+                        bounds[side].append(endpoint)
+            recognized.append(clause)
+        except UnsupportedConstraint as error:
+            unsupported.append(f"{clause}: {error}")
+    if not integer_size:
+        unsupported.append(f"Missing an explicit clause declaring {size_name} to be an integer")
+    if alphabet is None:
+        unsupported.append("Missing an explicit string length and literal alphabet declaration")
+    for side, entries in bounds.items():
+        if not entries:
+            unsupported.append(f"Missing {side} bound for size")
+    if unsupported:
+        return None
+    try:
+        return StringConstraints(
+            size_name=size_name,
+            size_min=max(bounds["lower"]),
+            size_max=min(bounds["upper"]),
+            string_name=string_name,
+            alphabet=alphabet,
+            stress_max_size=max_size,
+            url=url,
+        )
+    except ValueError as error:
+        unsupported.append(f"Constraints cannot be represented by the supported model: {error}")
+        return None
+
+
 def analyze_statement(html: bytes, url: str, *, max_size: int = 30) -> ConstraintAnalysis:
     """Extract a complete supported model, preserving every unresolved condition."""
     constraints: list[str] = []
@@ -393,7 +509,9 @@ def analyze_statement(html: bytes, url: str, *, max_size: int = 30) -> Constrain
     unsupported: list[str] = []
     input_format = None
 
-    def result(spec: IntegerArrayConstraints | None = None) -> ConstraintAnalysis:
+    def result(
+        spec: IntegerArrayConstraints | StringConstraints | None = None,
+    ) -> ConstraintAnalysis:
         return ConstraintAnalysis(spec, input_format, constraints, recognized, unsupported)
 
     if type(max_size) is not int or not 1 <= max_size <= MAX_VALUE:
@@ -433,10 +551,23 @@ def analyze_statement(html: bytes, url: str, *, max_size: int = 30) -> Constrain
         # Restrict oj-template to the English subtree; it otherwise picks the
         # first matching heading, which can belong to the Japanese statement.
         input_format = oj_html.parse_input_format_string(str(english).encode("utf-8"), url=url)
-        size_name, values_name = _input_shape(input_format)
+        size_name, values_name, shape = _input_shape(input_format)
     except Exception as error:
         unsupported.append(f"Unsupported input format: {error or type(error).__name__}")
         return result()
+
+    if shape == "string":
+        return result(
+            _string_spec(
+                constraints,
+                recognized,
+                unsupported,
+                size_name=size_name,
+                string_name=values_name,
+                max_size=max_size,
+                url=url,
+            )
+        )
 
     bounds: dict[tuple[str, str], list[int | str]] = {
         (target, side): [] for target in ("size", "values") for side in ("lower", "upper")

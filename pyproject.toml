@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "atcoder-environment"
-version = "0.5.0"
+version = "0.5.1"
 description = "A Python AtCoder workspace with reproducible local judging and shrinking"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"

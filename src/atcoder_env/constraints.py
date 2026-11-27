@@ -23,9 +23,9 @@ GENERATED_CASES = f'''"""Input strategies generated from the adjacent constraint
 # Reusable environment source: {SOURCE_URL}
 from pathlib import Path
 
-from atcoder_env.constraint_model import IntegerArrayConstraints
+from atcoder_env.constraint_io import load_constraints
 
-_constraints = IntegerArrayConstraints.from_toml(Path(__file__).with_name("constraints.toml"))
+_constraints = load_constraints(Path(__file__).with_name("constraints.toml"))
 
 strategy = _constraints.strategy
 serialize = _constraints.serialize
