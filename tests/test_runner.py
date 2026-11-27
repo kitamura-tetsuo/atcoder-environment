@@ -124,7 +124,7 @@ def is_running(pid: int) -> bool:
     if state_path.exists():
         try:
             return state_path.read_text().split(")", 1)[1].split()[0] != "Z"
-        except FileNotFoundError:
+        except (FileNotFoundError, ProcessLookupError):
             return False
     try:
         os.kill(pid, 0)
