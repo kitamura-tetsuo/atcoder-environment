@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import random
 import re
 import sys
@@ -58,8 +59,12 @@ def case_module(root: Path):
         sys.path.remove(str(root))
 
 
-def serialized(module: ModuleType, case: object) -> str:
-    result = module.serialize(case)
+def serialized(module: ModuleType, case: object, *, allow_out_of_range: bool = False) -> str:
+    serializer = module.serialize
+    if allow_out_of_range and "allow_out_of_range" in inspect.signature(serializer).parameters:
+        result = serializer(case, allow_out_of_range=True)
+    else:
+        result = serializer(case)
     if not isinstance(result, str):
         raise ValueError("cases.serialize(case) must return str")
     return result

@@ -63,10 +63,12 @@ class StringConstraints:
     def effective_stress_max_size(self) -> int:
         return min(self.stress_max_size, self.size_max)
 
-    def validate_case(self, case: str) -> None:
+    def validate_case(self, case: str, *, allow_out_of_range: bool = False) -> None:
         if not isinstance(case, str):
             raise ValueError("A string case must be a str")
-        if not self.size_min <= len(case) <= self.size_max:
+        if not (
+            len(case) > 0 if allow_out_of_range else self.size_min <= len(case) <= self.size_max
+        ):
             raise ValueError(
                 f"{self.string_name} length must be in the official "
                 f"{self.size_name} range {self.size_min}..{self.size_max}; got {len(case)}"
@@ -85,8 +87,8 @@ class StringConstraints:
             max_size=self.effective_stress_max_size,
         )
 
-    def serialize(self, case: str) -> str:
-        self.validate_case(case)
+    def serialize(self, case: str, *, allow_out_of_range: bool = False) -> str:
+        self.validate_case(case, allow_out_of_range=allow_out_of_range)
         return f"{len(case)}\n{case}\n"
 
     def edge_cases(self) -> list[str]:
@@ -97,20 +99,41 @@ class StringConstraints:
             cases.extend((cycle, cycle[::-1]))
         return list(dict.fromkeys(cases))
 
-    def benchmark_patterns(self, size: int) -> tuple[str, ...]:
-        return self._integer_model().benchmark_patterns(size)
+    def benchmark_patterns(self, size: int, *, allow_out_of_range: bool = False) -> tuple[str, ...]:
+        return self._integer_model().benchmark_patterns(size, allow_out_of_range=allow_out_of_range)
 
-    def benchmark_case(self, size: int, seed: int, *, pattern: str = "default") -> str:
-        indices = self._integer_model().benchmark_case(size, seed, pattern=pattern)
+    def benchmark_case(
+        self,
+        size: int,
+        seed: int,
+        *,
+        pattern: str = "default",
+        allow_out_of_range: bool = False,
+    ) -> str:
+        indices = self._integer_model().benchmark_case(
+            size, seed, pattern=pattern, allow_out_of_range=allow_out_of_range
+        )
         return self._decode(indices)
 
     def benchmark_strategy(
-        self, max_size: int, seed: int, *, pattern: str = "default", size_only: bool = False
+        self,
+        max_size: int,
+        seed: int,
+        *,
+        pattern: str = "default",
+        size_only: bool = False,
+        allow_out_of_range: bool = False,
     ):
         """Retain compact distribution shrinking for full-size resource failures."""
         return (
             self._integer_model()
-            .benchmark_strategy(max_size, seed, pattern=pattern, size_only=size_only)
+            .benchmark_strategy(
+                max_size,
+                seed,
+                pattern=pattern,
+                size_only=size_only,
+                allow_out_of_range=allow_out_of_range,
+            )
             .map(self._decode)
         )
 

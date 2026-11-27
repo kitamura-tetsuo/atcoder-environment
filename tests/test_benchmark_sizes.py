@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from loguru import logger
 
 from atcoder_env.benchmark_sizes import choose_benchmark_sizes
 from atcoder_env.constraint_model import IntegerArrayConstraints
@@ -71,10 +72,19 @@ def test_explicit_sizes_keep_requested_order_without_adding_defaults(tmp_path):
 
 
 @pytest.mark.parametrize("requested", [[1], [300_001], [2, 30, 300_001]])
-def test_any_explicit_size_outside_official_bounds_is_rejected(tmp_path, requested):
+def test_explicit_out_of_range_sizes_warn_but_keep_requested_order(tmp_path, requested):
     write_constraints(tmp_path)
-    with pytest.raises(ValueError, match="outside the official N range 2..300000"):
-        choose_benchmark_sizes(tmp_path, requested)
+    messages = []
+    sink = logger.add(lambda message: messages.append(message.record["message"]), level="WARNING")
+    try:
+        assert choose_benchmark_sizes(tmp_path, requested) == requested
+    finally:
+        logger.remove(sink)
+    warnings = [
+        message for message in messages if "outside the official N range 2..300000" in message
+    ]
+    assert len(warnings) == sum(size < 2 or size > 300_000 for size in requested)
+    assert all("--sizes" in message for message in warnings)
 
 
 @pytest.mark.parametrize("requested", [[], [0], [-1], [True], [2.0], ["2"], [2, 2], (2, 3)])
