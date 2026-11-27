@@ -14,6 +14,7 @@ from loguru import logger
 from atcoder_env import __version__
 from atcoder_env.artifacts import configure_logging
 from atcoder_env.config import command_args, load_config, validate_config
+from atcoder_env.constraint_model import BENCHMARK_PATTERNS
 from atcoder_env.external import (
     download_samples,
     executable,
@@ -108,6 +109,12 @@ def build_parser() -> argparse.ArgumentParser:
                 "--timeout", type=positive_float, help="Wall timeout per solution process"
             )
             command.add_argument("--comparison", choices=("tokens", "exact", "float"))
+            command.add_argument(
+                "--memory-limit",
+                type=positive_int,
+                metavar="MiB",
+                help="Resident memory limit in MiB (bench default: 512)",
+            )
         return command
 
     problem_command("test", "Run all sample and regression input/output pairs", run_options=True)
@@ -140,6 +147,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("--repeat", type=positive_int, default=3)
     bench.add_argument("--seed", type=int)
+    bench.add_argument(
+        "--pattern",
+        choices=("all", *BENCHMARK_PATTERNS),
+        default="all",
+        help="Input distribution (default: all feasible declared patterns)",
+    )
+    bench.add_argument(
+        "--no-profile", action="store_true", help="Disable automatic bottleneck profiling"
+    )
+    bench.add_argument(
+        "--slow-seconds",
+        type=positive_float,
+        help="Successful-run threshold for diagnostics (default: 80%% of timeout)",
+    )
+    bench.add_argument(
+        "--no-shrink", action="store_true", help="Keep resource cases without Hypothesis reduction"
+    )
+    bench.add_argument(
+        "--shrink-budget",
+        type=positive_float,
+        default=30.0,
+        help="Hypothesis search seconds per pattern and resource symptom (default: 30)",
+    )
+    bench.add_argument(
+        "--profile-timeout",
+        type=positive_float,
+        default=10.0,
+        help="Separate profiling time budget in seconds (default: 10)",
+    )
     run = problem_command(
         "run", "Run one input and save stdout, stderr, timing, and status", run_options=True
     )
@@ -180,6 +216,8 @@ def doctor() -> int:
     for package in (
         "atcoder-environment",
         "hypothesis",
+        "line-profiler",
+        "psutil",
         "cyaron",
         "loguru",
         "online-judge-tools",
@@ -271,6 +309,8 @@ def main(argv: list[str] | None = None) -> int:
             value = getattr(args, option, None)
             if value is not None:
                 setattr(config, option, value)
+        if getattr(args, "memory_limit", None) is not None:
+            config.memory_limit_mib = args.memory_limit
         validate_config(config)
         if args.action == "test":
             return test_samples(config)
@@ -289,6 +329,13 @@ def main(argv: list[str] | None = None) -> int:
                 sizes=args.sizes,
                 repeat=args.repeat,
                 seed=args.seed if args.seed is not None else config.seed,
+                pattern=args.pattern,
+                profile=not args.no_profile,
+                profile_timeout=args.profile_timeout,
+                slow_seconds=args.slow_seconds,
+                memory_limit_mib=config.memory_limit_mib or 512,
+                shrink=not args.no_shrink,
+                shrink_budget=args.shrink_budget,
             )
         if args.action == "run":
             return run_input(config, args.input, expected_path=args.expected)

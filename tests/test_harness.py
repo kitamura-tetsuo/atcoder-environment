@@ -193,3 +193,81 @@ def test_benchmark_saves_scaling_measurements_without_claiming_correctness(works
     assert all(int(row["runs"]) == 2 for row in rows)
     assert all(float(row["median_seconds"]) > 0 for row in rows)
     assert all(row["status"] == "ok" for row in rows)
+
+
+def test_benchmark_profiles_top_level_functions_and_same_input(workspace):
+    source = workspace.root / "main.py"
+    source.write_text(
+        "import sys\nimport time\n"
+        "def outer():\n"
+        "    value = 1\n"
+        "    def inner():\n"
+        "        time.sleep(0.05)\n"
+        "        return value\n"
+        "    return inner()\n"
+        "if __name__ == '__main__':\n"
+        "    time.sleep(0.05)\n"
+        "    print(outer(), sys.argv[1], len(sys.stdin.read()))\n"
+    )
+    workspace.solution = [sys.executable, "main.py", "argument"]
+    original = source.read_bytes()
+    assert benchmark(workspace, sizes=[10], repeat=2, seed=3, slow_seconds=0.01, shrink=False) == 0
+    session = latest_session(workspace, "bench")
+    target = session / "size-10-slow" / "profile"
+    baseline = session / "size-10-run-1"
+    assert source.read_bytes() == original
+    assert (baseline / "input.txt").read_bytes() == (target / "input.txt").read_bytes()
+    assert (baseline / "actual.txt").read_bytes() == (target / "actual.txt").read_bytes()
+    assert read_json(target / "profile-status.json")["status"] == "ok"
+    with (target / "line-profile.csv").open(newline="") as stream:
+        rows = list(csv.DictReader(stream))
+    by_line = {int(row["line"]): row for row in rows}
+    for line, name in ((6, "outer.<locals>.inner"), (10, "<module>")):
+        assert by_line[line]["function"] == name
+        assert int(by_line[line]["hits"]) == 1
+        assert float(by_line[line]["seconds"]) >= 0.03
+    assert read_json(session / "summary.json")["rows"][0]["runs"] == 2
+
+
+def test_benchmark_profiles_tle_and_saves_partial_rows(workspace):
+    (workspace.root / "main.py").write_text("x = 0\nwhile True:\n    x += 1\n")
+    workspace.timeout = 0.2
+    assert (
+        benchmark(workspace, sizes=[10, 20], repeat=1, seed=3, shrink=False, profile_timeout=0.2)
+        == 1
+    )
+    session = latest_session(workspace, "bench")
+    target = session / "size-10-timeout" / "profile"
+    assert read_json(target / "profile-status.json")["partial"] is True
+    assert read_json(target / "profile-status.json")["status"] == "timeout"
+    with (target / "line-profile.csv").open(newline="") as stream:
+        rows = list(csv.DictReader(stream))
+    assert any(row["line"] == "3" and int(row["hits"]) > 1 for row in rows)
+    summary = read_json(session / "summary.json")
+    assert len(summary["rows"]) == 1
+    assert summary["rows"][0]["status"] == "timeout"
+    assert summary["rows"][0]["profile_status"] == "timeout"
+
+
+def test_profile_timeout_does_not_change_normal_measurement(workspace):
+    (workspace.root / "main.py").write_text("import time\ntime.sleep(0.2)\n")
+    assert (
+        benchmark(
+            workspace,
+            sizes=[10],
+            repeat=1,
+            seed=3,
+            slow_seconds=0.01,
+            shrink=False,
+            profile_timeout=0.05,
+        )
+        == 2
+    )
+    summary = read_json(latest_session(workspace, "bench") / "summary.json")
+    assert summary["rows"][0]["status"] == "ok"
+    assert summary["rows"][0]["profile_status"] == "timeout"
+
+
+def test_benchmark_pattern_rejects_unsupported_custom_generator(workspace):
+    with pytest.raises(ValueError, match="does not support --pattern"):
+        benchmark(workspace, sizes=[10], repeat=1, seed=3, pattern="balanced")

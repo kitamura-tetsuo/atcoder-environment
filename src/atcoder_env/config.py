@@ -19,6 +19,7 @@ class Config:
     timeout: float = 2.0
     oracle_timeout: float = 5.0
     output_limit: int = 1_048_576
+    memory_limit_mib: int | None = None
     comparison: str = "tokens"
     atol: float = 1e-9
     rtol: float = 1e-9
@@ -52,6 +53,7 @@ def load_config(path: Path) -> Config:
                 "timeout",
                 "oracle_timeout",
                 "output_limit",
+                "memory_limit_mib",
                 "comparison",
                 "atol",
                 "rtol",
@@ -86,6 +88,10 @@ def validate_config(config: Config) -> None:
         value = getattr(config, name)
         if type(value) is not int or value < 1:
             raise ValueError(f"{name} must be a positive integer")
+    if config.memory_limit_mib is not None and (
+        type(config.memory_limit_mib) is not int or config.memory_limit_mib <= 0
+    ):
+        raise ValueError("memory_limit_mib must be a positive integer")
     if type(config.seed) is not int:
         raise ValueError("seed must be an integer")
     if config.comparison not in {"tokens", "exact", "float"}:

@@ -64,16 +64,36 @@ def test_url_benchmark_defaults_execute_official_maximum_and_save_evidence(
     result = invoke(tmp_path, "bench", URL, "--repeat", "1")
     assert result.returncode == 0, result.stdout + result.stderr
     session, rows = measurements(generated_problem)
-    assert [int(row["size"]) for row in rows] == [2, 10, 100, 1_000, 10_000, 100_000, 300_000]
-    assert all(row["status"] == "ok" and row["runs"] == "1" for row in rows)
+    assert [int(row["size"]) for row in rows if row["pattern"] == "default"] == [
+        2,
+        10,
+        100,
+        1_000,
+        10_000,
+        100_000,
+        300_000,
+    ]
+    assert all(row["status"] == "ok" for row in rows)
+    assert all(row["runs"] == ("0" if row["duplicate_of"] else "1") for row in rows)
+    assert {row["pattern"] for row in rows} == {
+        "default",
+        "balanced",
+        "alternating",
+        "blocks",
+        "palette",
+        "distinct",
+        "sorted",
+        "reversed",
+        "random",
+    }
     maximum = session / "size-300000-run-1"
     assert (maximum / "actual.txt").read_text() == "300000\n"
     assert len((maximum / "input.txt").read_text().split()) == 300_001
     summary = json.loads((session / "summary.json").read_text())
     assert summary["checks_correctness"] is False
     assert summary["rows"][-1]["size"] == 300_000
-    assert "n=300000:" in result.stdout
-    assert "n=300000:" in (generated_problem / ".ac" / "logs" / "ac.log").read_text()
+    assert "n=300000, pattern=" in result.stdout
+    assert "n=300000, pattern=" in (generated_problem / ".ac" / "logs" / "ac.log").read_text()
 
 
 def test_explicit_sizes_override_defaults_and_preserve_requested_order(
@@ -84,7 +104,7 @@ def test_explicit_sizes_override_defaults_and_preserve_requested_order(
     )
     assert result.returncode == 0, result.stdout + result.stderr
     _session, rows = measurements(generated_problem)
-    assert [int(row["size"]) for row in rows] == [1_000, 2, 100]
+    assert [int(row["size"]) for row in rows if row["pattern"] == "default"] == [1_000, 2, 100]
 
 
 def test_out_of_range_size_fails_before_any_generator_solution_or_session(

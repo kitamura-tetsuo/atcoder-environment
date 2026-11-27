@@ -47,6 +47,7 @@ class PairedRunner:
             cwd=config.root,
             timeout=config.oracle_timeout if oracle else config.timeout,
             output_limit=config.output_limit,
+            memory_limit_mib=None if oracle else config.memory_limit_mib,
             cancel_event=cancel_event,
         )
 

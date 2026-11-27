@@ -31,6 +31,8 @@ strategy = _constraints.strategy
 serialize = _constraints.serialize
 edge_cases = _constraints.edge_cases
 benchmark_case = _constraints.benchmark_case
+benchmark_patterns = _constraints.benchmark_patterns
+benchmark_strategy = _constraints.benchmark_strategy
 '''
 
 

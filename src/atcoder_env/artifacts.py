@@ -62,6 +62,8 @@ def new_session(config: Config, kind: str) -> Path:
                 for name in (
                     "atcoder-environment",
                     "hypothesis",
+                    "line-profiler",
+                    "psutil",
                     "cyaron",
                     "online-judge-tools",
                     "online-judge-template-generator",
@@ -75,6 +77,7 @@ def new_session(config: Config, kind: str) -> Path:
             "timeout": config.timeout,
             "oracle_timeout": config.oracle_timeout,
             "output_limit": config.output_limit,
+            "memory_limit_mib": config.memory_limit_mib,
             "comparison": config.comparison,
             "atol": config.atol,
             "rtol": config.rtol,

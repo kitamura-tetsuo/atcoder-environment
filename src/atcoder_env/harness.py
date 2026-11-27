@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import csv
 import importlib.util
 import random
 import re
-import statistics
 import sys
 import time
 from contextlib import contextmanager
@@ -19,7 +17,7 @@ from hypothesis.errors import NoSuchExample
 from loguru import logger
 
 from atcoder_env.artifacts import new_session, save_case, write_json
-from atcoder_env.benchmark_sizes import choose_benchmark_sizes
+from atcoder_env.benchmark import benchmark as benchmark
 from atcoder_env.config import Config
 from atcoder_env.paired_runner import PairedRunner
 from atcoder_env.runner import RunResult, run_program, verdict
@@ -74,6 +72,7 @@ def execute(config: Config, data: str, *, oracle: bool = False) -> RunResult:
         cwd=config.root,
         timeout=config.oracle_timeout if oracle else config.timeout,
         output_limit=config.output_limit,
+        memory_limit_mib=None if oracle else config.memory_limit_mib,
     )
 
 
@@ -359,6 +358,7 @@ def run_input(config: Config, input_path: Path, *, expected_path: Path | None = 
             "timeout": "TLE",
             "runtime_error": "RE",
             "output_limit": "OLE",
+            "memory_limit": "MLE",
         }[result.status]
     )
     save_case(session, "case", input_data=data, actual=result, expected=expected, verdict=status)
@@ -404,72 +404,3 @@ def promote(config: Config, artifact: Path, name: str) -> int:
             handle.write(source.read_text(encoding="utf-8"))
     logger.info("Saved regression test: {}", target_input)
     return 0
-
-
-def benchmark(config: Config, *, sizes: list[int] | None = None, repeat: int, seed: int) -> int:
-    source = (
-        "--sizes"
-        if sizes is not None
-        else ("constraints.toml" if (config.root / "constraints.toml").exists() else "fallback")
-    )
-    sizes = choose_benchmark_sizes(config.root, sizes)
-    logger.info("Benchmark sizes ({}): {}", source, ", ".join(map(str, sizes)))
-    if source == "fallback":
-        logger.info("No constraints.toml; use --sizes to cover this problem's official bounds")
-    session = new_session(config, "bench")
-    rows = []
-    failed = False
-    with case_module(config.root) as module:
-        if not callable(getattr(module, "benchmark_case", None)):
-            raise ValueError("cases.py must define benchmark_case(size, seed)")
-        for size in sizes:
-            data = serialized(module, module.benchmark_case(size, seed))
-            results = []
-            for attempt in range(repeat):
-                result = execute(config, data)
-                results.append(result)
-                status = "OK" if result.status == "ok" else judge(config, result, "")
-                save_case(
-                    session,
-                    f"size-{size}-run-{attempt + 1}",
-                    input_data=data,
-                    actual=result,
-                    verdict=status,
-                    details={"size": size, "seed": seed},
-                )
-                if result.status != "ok":
-                    failed = True
-                    break
-            times = [result.elapsed_seconds for result in results]
-            row = {
-                "size": size,
-                "runs": len(results),
-                "median_seconds": statistics.median(times),
-                "min_seconds": min(times),
-                "max_seconds": max(times),
-                "status": results[-1].status,
-                "input_bytes": len(data.encode("utf-8")),
-            }
-            rows.append(row)
-            logger.info(
-                "n={}: median={:.4f}s, status={}", size, row["median_seconds"], row["status"]
-            )
-            if failed:
-                logger.warning("Stopping at failed size; larger sizes were not executed")
-                break
-    with (session / "benchmark.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
-    write_json(
-        session / "summary.json",
-        {
-            "seed": seed,
-            "sizes": sizes,
-            "sizes_source": source,
-            "rows": rows,
-            "checks_correctness": False,
-        },
-    )
-    logger.info("Measurements: {}", session / "benchmark.csv")
-    return int(failed)
