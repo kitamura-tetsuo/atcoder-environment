@@ -47,6 +47,14 @@
       "label": "AtCoder: Benchmark",
       "type": "process",
       "command": "uv",
+      "args": ["run", "--frozen", "ac", "bench", "${input:problemDirectory}", "--repeat", "3"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "AtCoder: Benchmark custom sizes",
+      "type": "process",
+      "command": "uv",
       "args": ["run", "--frozen", "ac", "bench", "${input:problemDirectory}", "--sizes", "${input:benchmarkSizes}", "--repeat", "3"],
       "options": {"cwd": "${workspaceFolder}"},
       "problemMatcher": []
