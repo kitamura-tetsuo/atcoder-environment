@@ -1,0 +1,93 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AtCoder: Check environment",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "--frozen", "ac", "doctor"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "AtCoder: Create problem",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "--frozen", "ac", "new", "${input:newProblemDirectory}", "--template", "${input:template}"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "AtCoder: Download samples",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "--frozen", "ac", "prepare", "${input:problemUrl}"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "AtCoder: Run sample tests",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "--frozen", "ac", "test", "${input:problemDirectory}"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": {"kind": "test", "isDefault": true},
+      "problemMatcher": []
+    },
+    {
+      "label": "AtCoder: Stress test and shrink",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "--frozen", "ac", "stress", "${input:problemDirectory}", "--max-examples", "1000", "--seed", "${input:seed}"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "AtCoder: Benchmark",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "--frozen", "ac", "bench", "${input:problemDirectory}", "--sizes", "${input:benchmarkSizes}", "--repeat", "3"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "problemDirectory",
+      "type": "promptString",
+      "description": "Problem directory relative to the repository",
+      "default": "examples/pair-sum"
+    },
+    {
+      "id": "newProblemDirectory",
+      "type": "promptString",
+      "description": "New problem directory relative to the repository",
+      "default": "problems/practice"
+    },
+    {
+      "id": "template",
+      "type": "pickString",
+      "description": "Input strategy scaffold (edit its constraints for your problem)",
+      "options": ["array", "tree"],
+      "default": "array"
+    },
+    {
+      "id": "problemUrl",
+      "type": "promptString",
+      "description": "AtCoder problem URL"
+    },
+    {
+      "id": "seed",
+      "type": "promptString",
+      "description": "Random seed for a reproducible stress test",
+      "default": "42"
+    },
+    {
+      "id": "benchmarkSizes",
+      "type": "promptString",
+      "description": "Comma-separated input sizes valid for your problem",
+      "default": "100,1000,10000"
+    }
+  ]
+}
