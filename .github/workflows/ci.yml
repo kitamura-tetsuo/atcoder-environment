@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
+          enable-cache: true
+          cache-suffix: python-${{ matrix.python }}
+      - name: Install locked dependencies
+        run: uv sync --frozen
+      - name: Lint
+        run: uv run --frozen ruff check .
+      - name: Check formatting
+        run: uv run --frozen ruff format --check .
+      - name: Test
+        run: uv run --frozen pytest
+      - name: Check tool integration
+        run: uv run --frozen ac doctor
+      - name: Test bundled example
+        run: uv run --frozen ac test examples/pair-sum
+      - name: Stress test bundled example
+        run: uv run --frozen ac stress examples/pair-sum --max-examples 100 --seed 42
+      - name: Verify failure exit code
+        shell: bash
+        run: |
+          status=0
+          uv run --frozen ac stress examples/pair-sum --solution 'python buggy.py' --max-examples 100 --seed 42 || status=$?
+          test "$status" -eq 1
+
+  docker:
+    name: Docker Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Build image for the runner user
+        shell: bash
+        run: |
+          export LOCAL_UID="$(id -u)"
+          export LOCAL_GID="$(id -g)"
+          docker compose config --quiet
+          docker compose build
+      - name: Verify container tools and samples
+        run: |
+          docker compose run --rm -T dev ac doctor
+          docker compose run --rm -T dev ac test examples/pair-sum
+          docker compose run --rm -T dev ac stress examples/pair-sum --max-examples 100 --seed 42
+          docker compose run --rm -T dev ac bench examples/pair-sum --sizes 100,1000,10000 --repeat 2
+      - name: Verify container failure exit code
+        shell: bash
+        run: |
+          status=0
+          docker compose run --rm -T dev ac stress examples/pair-sum --solution 'python buggy.py' --max-examples 100 --seed 42 || status=$?
+          test "$status" -eq 1
+      - name: Verify workspace file ownership
+        shell: bash
+        run: |
+          docker compose run --rm -T dev ac new problems/container-smoke
+          test "$(stat -c %u problems/container-smoke/main.py)" -eq "$(id -u)"
+      - name: Clean up containers and volumes
+        if: always()
+        run: docker compose down --volumes

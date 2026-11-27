@@ -221,3 +221,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local problem workspaces, execution evidence, and authentication state
+/problems/
+.ac/
+*.cookie
+cookies.txt
+cookie.jar
+.env.*
