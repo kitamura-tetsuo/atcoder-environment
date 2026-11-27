@@ -92,7 +92,7 @@ def test_prepare_existing_empty_cwd_downloads_only_samples(tmp_path: Path) -> No
     env = fake_external_tools(tmp_path)
     destination = tmp_path / "workspace"
     destination.mkdir()
-    result = invoke(destination, "prepare", URL, "--directory", ".", env=env)
+    result = invoke(destination, "prepare", URL, "--directory", ".", "--no-constraints", env=env)
     assert result.returncode == 0, result.stdout + result.stderr
     assert (destination / "test" / "sample-1.in").read_text() == "1 2\n"
     assert (destination / "test" / "sample-1.out").read_text() == "3\n"
@@ -158,7 +158,9 @@ def test_samples_save_actual_stderr_and_dual_logs(tmp_path: Path) -> None:
 
 def test_template_generates_drafts_without_overwriting_source(tmp_path: Path) -> None:
     env = fake_external_tools(tmp_path)
-    created = invoke(tmp_path, "prepare", URL, "--directory", "problem", env=env)
+    created = invoke(
+        tmp_path, "prepare", URL, "--directory", "problem", "--no-constraints", env=env
+    )
     assert created.returncode == 0, created.stdout + created.stderr
     root = tmp_path / "problem"
     source = root / "main.py"
@@ -175,7 +177,9 @@ def test_template_generates_drafts_without_overwriting_source(tmp_path: Path) ->
 
 def test_download_conflict_preserves_existing_samples(tmp_path: Path) -> None:
     env = fake_external_tools(tmp_path)
-    created = invoke(tmp_path, "prepare", URL, "--directory", "problem", env=env)
+    created = invoke(
+        tmp_path, "prepare", URL, "--directory", "problem", "--no-constraints", env=env
+    )
     assert created.returncode == 0, created.stdout + created.stderr
     root = tmp_path / "problem"
     sample = root / "test" / "sample-1.in"

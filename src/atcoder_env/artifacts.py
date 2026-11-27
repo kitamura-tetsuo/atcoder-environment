@@ -40,7 +40,7 @@ def new_session(config: Config, kind: str) -> Path:
     session.mkdir(parents=True)
     source_dir = session / "sources"
     source_dir.mkdir()
-    files = {"main.py", "brute.py", "cases.py", "atcoder.toml"}
+    files = {"main.py", "brute.py", "cases.py", "atcoder.toml", "constraints.toml"}
     files.update(arg for arg in config.solution + config.oracle if arg.endswith(".py"))
     hashes = {}
     for name in sorted(files):
@@ -59,7 +59,15 @@ def new_session(config: Config, kind: str) -> Path:
             "python": sys.version,
             "package_versions": {
                 name: importlib.metadata.version(name)
-                for name in ("atcoder-environment", "hypothesis", "cyaron", "online-judge-tools")
+                for name in (
+                    "atcoder-environment",
+                    "hypothesis",
+                    "cyaron",
+                    "online-judge-tools",
+                    "online-judge-template-generator",
+                    "sympy",
+                    "antlr4-python3-runtime",
+                )
             },
             "workspace": str(config.root),
             "solution": config.solution,
