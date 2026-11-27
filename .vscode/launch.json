@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "AtCoder: Debug Test (oj)",
+      "name": "AtCoder: Debug latest failure or tests",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/.vscode/debug_test.py",

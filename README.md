@@ -92,12 +92,23 @@ EOF
 ### VS Code のブレークポイントでデバッグする
 
 1. 対象問題の `main.py` をエディターで開き、停止したい行にブレークポイントを置きます。
-2. 「実行とデバッグ」（Ctrl+Shift+D）で **AtCoder: Debug Test (oj)** を選び、F5 を押します。
-3. `test/` のサンプル・回帰テストが順に実行され、各解答プロセスでブレークポイントに停止します。変数の確認、ステップ実行、続行（F5）ができます。
+2. 「実行とデバッグ」（Ctrl+Shift+D）で **AtCoder: Debug latest failure or tests** を選び、F5 を押します。
+3. 対象問題の最新の実行ログに応じて、次の入力が自動選択されます。ブレークポイントで停止し、変数の確認、ステップ実行、続行（F5）ができます。
 
-以前の練習環境と同じ online-judge-tools と VS Code Python Debugger（debugpy）の subprocess 機能を使用します。`judge.py` がある場合は対話型ジャッジを優先します。`main.py` 単体を実行したい場合は **Python Debugger: Current File** を選びます。
+| 最新の実行ログ | デバッグする入力 |
+| --- | --- |
+| `ac stress` で失敗 | 保存された反例。縮小後の `failure/input.txt` を優先 |
+| `ac bench` で失敗 | 失敗した各分布の入力を順に実行。再現確認済みの縮小入力を優先し、なければ元の失敗入力 |
+| `ac stress` の参照解がエラー | `oracle-error/input.txt` を現在の参照解へ渡す |
+| 最新が成功・反例なし、`ac test` / `ac run`、または保存された失敗入力なし | `test/` のサンプル・回帰テスト |
 
-Dev Container では設定済みの `/opt/venv/bin/python`、ローカルでは `uv sync --frozen` 後に **Python: Select Interpreter** で `.venv/bin/python` を選んでください。デバッグは oj の判定を用い、ブレークポイントで停止できるよう ac の時間・メモリ制限を適用しません。実行時間の測定や ac のログ保存は通常の `ac test` / `ac bench` で行ってください。
+「最新」は、その問題の `.ac/runs/` 内の実行開始日時で判定します。最新が成功していれば、それ以前の失敗へ戻りません。ベンチマークの `slow` 判定だけで正常終了した入力や、プロファイル用の実行結果は自動選択しません。解析中に中断した実行でも、失敗した入力が保存されていれば利用します。
+
+失敗入力は、`atcoder.toml` の現在の解答コマンド（参照解の失敗なら現在の参照解コマンド）へ標準入力として渡します。保存当時のソースではなく、修正中のコードをデバッグできます。対象入力・分布・過去の判定はターミナルと `.ac/logs/ac.log` に表示します。デバッグ自体は新しい実行ログを作らないため、次の `ac stress` / `ac bench` / `ac test` などを行うまでは、F5で同じ入力を再利用できます。
+
+サンプルへのフォールバックでは、以前の練習環境と同じ online-judge-tools を使います。`judge.py` がある場合は対話型ジャッジを優先します。`main.py` 単体を実行したい場合は **Python Debugger: Current File** を選びます。
+
+Dev Container では設定済みの `/opt/venv/bin/python`、ローカルでは `uv sync --frozen` 後に **Python: Select Interpreter** で `.venv/bin/python` を選んでください。VS Code Python Debugger（debugpy）の subprocess 機能で解答へ追従します。ブレークポイントで停止できるよう、デバッグではacの時間・メモリ制限を適用しません。性能の再計測や修正後の合否確認には通常の `ac test` / `ac stress` / `ac bench` を使ってください。
 
 ## Dockerを使わない場合
 
