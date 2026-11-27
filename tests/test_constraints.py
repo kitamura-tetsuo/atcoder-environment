@@ -73,6 +73,23 @@ def test_unknown_clause_never_installs_partial_generator(tmp_path: Path) -> None
     assert not (root / "constraints.toml").exists()
     assert not (folder / "cases.py").exists()
     assert (root / "cases.py").read_bytes() == before
+    edits = report["manual_edits"]
+    assert edits["file"] == str(root / "cases.py")
+    assert "<var>" not in edits["input_format"]
+    assert "C_1" in edits["input_format"]
+    assert "The sum of the colors is even." in edits["constraints"]
+    assert set(edits["functions"]) == {
+        "strategy()",
+        "serialize(case)",
+        "edge_cases()",
+        "benchmark_case(size, seed)",
+        "benchmark_patterns(size)",
+        "benchmark_strategy(max_size, seed, pattern=...)",
+    }
+    log = (root / ".ac" / "logs" / "ac.log").read_text()
+    for function in edits["functions"]:
+        assert function in log
+    assert "The sum of the colors is even." in log
 
 
 def test_successful_import_replaces_edited_generator_and_configuration(tmp_path: Path) -> None:
@@ -120,3 +137,27 @@ def test_prepare_can_explicitly_skip_constraint_fetch(tmp_path: Path, monkeypatc
     assert cli.main(["prepare", URL, "-d", str(root), "--no-constraints"]) == 0
     assert not (root / "constraints.toml").exists()
     assert not (root / ".ac" / "constraints").exists()
+
+
+def test_unsupported_input_shape_prints_actual_format_and_edit_targets(tmp_path):
+    root = create_workspace(tmp_path / "problem", url=URL)
+    fixture = Path(__file__).with_name("fixtures") / "abc485_e_constraints.html"
+    text = fixture.read_text().replace("<var>C_M</var>", "<var>C_N</var>")
+    source = tmp_path / "unsupported.html"
+    source.write_text(text)
+    assert cli.main(["constraints", str(root), "--html", str(source)]) == 2
+    _, report = report_for(root)
+    assert report["status"] == "UNSUPPORTED"
+    assert report["manual_edits"]["input_format"].startswith("N M\nU_1 V_1 C_1")
+    assert len(report["manual_edits"]["constraints"]) == 6
+    log = (root / ".ac" / "logs" / "ac.log").read_text()
+    for expected in (
+        "Unsupported input format",
+        "N M",
+        "U_1 V_1 C_1",
+        "strategy()",
+        "serialize(case)",
+        "benchmark_case(size, seed)",
+    ):
+        assert expected in log
+    assert str(root / "cases.py") in log
