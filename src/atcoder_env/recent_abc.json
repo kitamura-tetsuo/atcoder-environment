@@ -1,0 +1,2485 @@
+{
+  "abc485_a": {
+    "statement_sha256": "daf174f3c3af03a2355fa45deb44f79f896c43fd8c139fa8a2d7cedcab83e3ad",
+    "size_name": "size",
+    "size_min": 1,
+    "size_max": 1,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "A",
+            "lo": -100,
+            "hi": 100,
+            "exclude": [
+              0
+            ]
+          },
+          {
+            "name": "B",
+            "lo": -100,
+            "hi": 100,
+            "exclude": [
+              0,
+              "A"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "abc485_b": {
+    "statement_sha256": "80fbc36c99298430e0f639f0a7c8cb1358ea15e75e83d086568f2e32aeaad8df",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 100,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 2,
+            "hi": 100,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "clogged",
+        "n": "N",
+        "m": "M"
+      }
+    ]
+  },
+  "abc485_f": {
+    "statement_sha256": "15920d372edb07276899c9b3a15e0b292399028d99a3abbf238332ca7b25e7e4",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 10000
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "N",
+        "variants": [
+          [
+            {
+              "name": "c",
+              "lo": 1,
+              "hi": "M"
+            },
+            {
+              "name": "v",
+              "lo": 1,
+              "hi": 1000000000
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc484_a": {
+    "statement_sha256": "4c03aaa7e39acba43c164ccab5bc51ccc50530f8a41a5350ea07a8bd2f899d21",
+    "size_name": "size",
+    "size_min": 1,
+    "size_max": 1,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "B",
+            "lo": 1,
+            "hi": 29
+          },
+          {
+            "name": "R",
+            "lo": 1,
+            "hi": 29
+          }
+        ]
+      }
+    ]
+  },
+  "abc484_b": {
+    "statement_sha256": "413c5e9cc3496fa9a31257508f4ea7a43e7dbcfda37dd923fa1cc11cb27b6e99",
+    "size_name": "K",
+    "size_min": 1,
+    "size_max": 9,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "K",
+            "lo": 1,
+            "hi": 9,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "K",
+        "lo": 1,
+        "hi": 9,
+        "mode": "unique"
+      }
+    ]
+  },
+  "abc484_c": {
+    "statement_sha256": "7970257cb909b6b37bcf7e22f4853ff0491130dc1f8987e1fa08c422efa6fcf0",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "N"
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "N"
+      }
+    ]
+  },
+  "abc484_d": {
+    "statement_sha256": "7bcc6d1e6d8f1c2def81a346d44c11646d662765791be61e6441a85d05fa8c2b",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "N"
+      }
+    ]
+  },
+  "abc484_e": {
+    "statement_sha256": "af514d1f6df4b937861726d7a646f7d19e0580306f8d154ca08162430110845a",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 300000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 300000,
+            "count": true
+          },
+          {
+            "name": "L",
+            "lo": -1000000000000000000,
+            "hi": 1000000000000000000
+          },
+          {
+            "name": "R",
+            "lo": "L",
+            "hi": 1000000000000000000
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": -1000000000000,
+        "hi": 1000000000000
+      }
+    ]
+  },
+  "abc484_f": {
+    "statement_sha256": "6d662c860aa7624c833e27f0d751e8f04f1aff618eb1608c36513716a46f4ca3",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 300000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 300000,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 300000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": -1,
+        "hi": 1000000,
+        "exclude": [
+          0
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "literal": 1
+            },
+            {
+              "name": "i",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "x",
+              "lo": -1,
+              "hi": 1000000,
+              "exclude": [
+                0
+              ]
+            }
+          ],
+          [
+            {
+              "literal": 2
+            },
+            {
+              "name": "l",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "r",
+              "lo": "l",
+              "hi": "N"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc484_g": {
+    "statement_sha256": "109bcd0a784466edfa2a884c93d098805578c1d2e08153afa56164ef5ab81267",
+    "size_name": "S_len",
+    "size_min": 1,
+    "size_max": 2000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "set",
+        "fields": [
+          {
+            "name": "S_len",
+            "lo": 1,
+            "hi": 2000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "S",
+            "alphabet": "01?",
+            "length": "S_len"
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "X",
+            "alphabet": "01?",
+            "lo": 1,
+            "hi": 8
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "Y",
+            "alphabet": "01?",
+            "lo": 1,
+            "hi": 8
+          }
+        ]
+      }
+    ]
+  },
+  "abc483_a": {
+    "statement_sha256": "db4453f60154c6a4de3d39797e61baf33c89cce73fc2feef40062c443f5f2e13",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100
+          }
+        ]
+      }
+    ]
+  },
+  "abc483_b": {
+    "statement_sha256": "f87480efaf51508d721dc141fb8280296455fb93e629bfce4f05ab591a6e9175",
+    "size_name": "Q",
+    "size_min": 1,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 100,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "Q",
+        "lo": 1,
+        "hi": "N"
+      }
+    ]
+  },
+  "abc483_c": {
+    "statement_sha256": "50a5523b9896739b86186454b5b082c067bb7515cce57799468350182b26d51d",
+    "size_name": "M",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "M",
+        "variants": [
+          [
+            {
+              "name": "A",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "B",
+              "lo": 1,
+              "hi": "N",
+              "exclude": [
+                "A"
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc483_d": {
+    "statement_sha256": "c362853e16b7dc46ee681dd881feae64b84b9f415bf42959bf9bbc443713e2fd",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": -1000000000,
+        "hi": 1000000000,
+        "exclude": [
+          0
+        ]
+      }
+    ]
+  },
+  "abc483_e": {
+    "statement_sha256": "0b3774d7496475d736c8e0dca82954c7e53af6943640096e74654e8045b90aae",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 2,
+            "hi": 6
+          }
+        ]
+      },
+      {
+        "op": "string_rows",
+        "n": "N",
+        "alphabet": "lowercase",
+        "length": "M"
+      }
+    ]
+  },
+  "abc483_f": {
+    "statement_sha256": "9cb39f6b66927a41f3591bfffba7156e09cb9266396b06c92eee4ce4c7f7424b",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 500000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 500000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "N",
+        "variants": [
+          [
+            {
+              "name": "A",
+              "lo": 0,
+              "hi": 499999
+            },
+            {
+              "name": "B",
+              "lo": "A+1",
+              "hi": 500000
+            }
+          ]
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "x",
+              "lo": 0,
+              "hi": 500000
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc483_g": {
+    "statement_sha256": "f87c0591798c64a6ac1ec878dab82afa48d2640f4abf6b153ebddd7e87f3b5e4",
+    "size_name": "T",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "T",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "cases",
+        "n": "T",
+        "steps": [
+          {
+            "op": "line",
+            "fields": [
+              {
+                "name": "N",
+                "lo": 2,
+                "hi": "min(1000000,total_N-2*remaining_cases)",
+                "count": true
+              },
+              {
+                "name": "K",
+                "lo": 1,
+                "hi": "N//2"
+              }
+            ]
+          }
+        ],
+        "budgets": {
+          "total_N": 1000000
+        },
+        "subtract": {
+          "total_N": "N"
+        }
+      }
+    ]
+  },
+  "abc482_a": {
+    "statement_sha256": "742a914a954dab8a5badec45459b23b4399a472a2cb0f7f77d062e2031ba6ea2",
+    "size_name": "S_len",
+    "size_min": 1,
+    "size_max": 10,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "set",
+        "fields": [
+          {
+            "name": "S_len",
+            "lo": 1,
+            "hi": 10,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "S",
+            "alphabet": "o.",
+            "length": "S_len"
+          }
+        ]
+      }
+    ]
+  },
+  "abc482_b": {
+    "statement_sha256": "a072a2df75aeee81c339c355635eb4e18ad4837f4bf60ef198a140e41dd4d15a",
+    "size_name": "size",
+    "size_min": 1,
+    "size_max": 1,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "string_rows",
+        "n": 5,
+        "alphabet": "o.",
+        "length": 5
+      }
+    ]
+  },
+  "abc482_c": {
+    "statement_sha256": "337a8286b9c1fee2b7d3a0d78b721506a1c291c4718819aacedd617f11f3f834",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 300000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "H",
+            "lo": 1,
+            "hi": 1000000000
+          },
+          {
+            "name": "W",
+            "lo": "max(1,(N+H-1)//H)",
+            "hi": 1000000000
+          },
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": "min(H*W,300000)",
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 300000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "unique_pairs",
+        "n": "N",
+        "h": "H",
+        "w": "W"
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "literal": 1
+            },
+            {
+              "name": "u",
+              "lo": 1,
+              "hi": "H"
+            },
+            {
+              "name": "d",
+              "lo": "u",
+              "hi": "H"
+            }
+          ],
+          [
+            {
+              "literal": 2
+            },
+            {
+              "name": "l",
+              "lo": 1,
+              "hi": "W"
+            },
+            {
+              "name": "r",
+              "lo": "l",
+              "hi": "W"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc482_d": {
+    "statement_sha256": "de4df85c5f46fc5f7446f32a0b795b9d5f61a6aeb3720ab873678236790caec2",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 0,
+        "hi": 1000000000,
+        "mode": "increasing",
+        "step": 2
+      }
+    ]
+  },
+  "abc482_e": {
+    "statement_sha256": "db1e2295f76ba3f58970193b0e23240c291f7f22e2de6edac4ff4849dc9aba51",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "tree",
+        "n": "N",
+        "ordered": false
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "N"
+      }
+    ]
+  },
+  "abc482_f": {
+    "statement_sha256": "4488625392dea18947e72e5096eb2505642cf3b55802246dc873aa3d1da58956",
+    "size_name": "M",
+    "size_min": 1,
+    "size_max": 400000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100000000000000
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 400000,
+            "count": true
+          }
+        ]
+      }
+    ]
+  },
+  "abc482_g": {
+    "statement_sha256": "0502fc30a42293b99b35dbe38b740227c9202719e2ad4cb571b259dd247941f9",
+    "size_name": "T",
+    "size_min": 1,
+    "size_max": 10,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "T",
+            "lo": 1,
+            "hi": 10,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "cases",
+        "n": "T",
+        "steps": [
+          {
+            "op": "line",
+            "fields": [
+              {
+                "name": "N",
+                "lo": 2,
+                "hi": "min(500,icbrt(total_cube-8*remaining_cases))",
+                "count": true
+              },
+              {
+                "name": "M",
+                "lo": 1,
+                "hi": "min(N*(N-1)//2,total_M-remaining_cases)",
+                "count": true
+              }
+            ]
+          },
+          {
+            "op": "array",
+            "n": "N",
+            "lo": 1,
+            "hi": "N-1",
+            "mode": "sum_bounded",
+            "sum": "min(500,icbrt(total_cube-8*remaining_cases))",
+            "name": "A"
+          },
+          {
+            "op": "unique_pairs",
+            "n": "M",
+            "h": "N",
+            "w": "N",
+            "triangle": true
+          }
+        ],
+        "budgets": {
+          "total_cube": 125000000,
+          "total_M": 200000
+        },
+        "subtract": {
+          "total_cube": "A_sum**3",
+          "total_M": "M"
+        }
+      }
+    ]
+  },
+  "abc481_a": {
+    "statement_sha256": "250f97dcf41066d5dc2c416c5084321b5dc68ca5831685ecec6fa43fe327a19a",
+    "size_name": "size",
+    "size_min": 1,
+    "size_max": 1,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "A",
+            "lo": 1,
+            "hi": 9
+          },
+          {
+            "name": "B",
+            "lo": 1,
+            "hi": 9
+          }
+        ]
+      }
+    ]
+  },
+  "abc481_b": {
+    "statement_sha256": "145505649835adbede7128e6cd7a72e097269851a3ea9d44b572e0f26f4c3488",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 100,
+            "count": true
+          },
+          {
+            "name": "K",
+            "lo": 1,
+            "hi": 100
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": 100,
+        "mode": "adjacent_distinct"
+      }
+    ]
+  },
+  "abc481_c": {
+    "statement_sha256": "88beb784e4cff7c183101c1fe3c145bd2203ecde5d17a29253572f24ca749719",
+    "size_name": "Q",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "s",
+              "alphabet": "lowercase",
+              "lo": 1,
+              "hi": 10
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc481_d": {
+    "statement_sha256": "9b9cb30b05374f0281b91da5db50fe323888f348a2c60b6021cbc4eb3652ea0f",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "S",
+            "lo": 1,
+            "hi": "N"
+          },
+          {
+            "name": "T",
+            "lo": 1,
+            "hi": "N",
+            "exclude": [
+              "S"
+            ]
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "M",
+        "variants": [
+          [
+            {
+              "name": "A",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "B",
+              "lo": 1,
+              "hi": "N",
+              "exclude": [
+                "A"
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc481_e": {
+    "statement_sha256": "6ea753e374d7d4f7022e0c863f5d2603a6e99c16c9a359812c59a209fec7cee0",
+    "size_name": "T",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "T",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "cases",
+        "n": "T",
+        "steps": [
+          {
+            "op": "line",
+            "fields": [
+              {
+                "name": "N",
+                "lo": 1,
+                "hi": "min(200000,total_N-remaining_cases)",
+                "count": true
+              }
+            ]
+          },
+          {
+            "op": "points",
+            "n": "N"
+          }
+        ],
+        "budgets": {
+          "total_N": 200000
+        },
+        "subtract": {
+          "total_N": "N"
+        }
+      }
+    ]
+  },
+  "abc481_f": {
+    "statement_sha256": "05949ef7010d5ac2bca09098a1e0c5e4e3334e479009f1663583fce12b47fbc0",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": "N-1",
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "reachable",
+        "vertices": "N",
+        "n": "M"
+      }
+    ]
+  },
+  "abc481_g": {
+    "statement_sha256": "b496bba12c3b53e02d87474f5af0fe151fb000f5ff59e3379a6687abc0c6afbe",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 120000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 120000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "N",
+        "variants": [
+          [
+            {
+              "name": "A",
+              "lo": 1,
+              "hi": 998244351
+            },
+            {
+              "name": "B",
+              "lo": "A+1",
+              "hi": 998244352
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc480_a": {
+    "statement_sha256": "922e1b92e2d49a07171b3f8372ea6aa205b10f8a24f7e4a7c4c02d5fb87161e1",
+    "size_name": "size",
+    "size_min": 1,
+    "size_max": 1,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "permutation_grid",
+        "alphabet": "ABCD",
+        "width": 2
+      }
+    ]
+  },
+  "abc480_b": {
+    "statement_sha256": "9da3c4e2d318ea68c1ae98b18dbc3d428e072f878ccdedd4223959eb91fb22b1",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 100,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "string_rows",
+        "n": "N",
+        "alphabet": "lowercase",
+        "lo": 1,
+        "hi": 10,
+        "unique": true
+      },
+      {
+        "op": "string_rows",
+        "n": "M",
+        "alphabet": "lowercase",
+        "lo": 1,
+        "hi": 10
+      }
+    ]
+  },
+  "abc480_c": {
+    "statement_sha256": "a1c7612397f0a24128c9478c84a45af320988cdf52f7e16e602731986b00aff8",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "K",
+            "lo": 1,
+            "hi": 1000000000
+          },
+          {
+            "name": "T",
+            "lo": 1,
+            "hi": 1000000000
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 0,
+        "hi": 1000000000
+      }
+    ]
+  },
+  "abc480_d": {
+    "statement_sha256": "1e620d6fb20b4ebb3bc863ba21703b95bcbd9edac49a6ee29f4e891d3f198802",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 100000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100000,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 100000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": -100000000,
+        "hi": 100000000
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "L",
+              "lo": 1,
+              "hi": "N*(N+1)//2"
+            },
+            {
+              "name": "R",
+              "lo": "L",
+              "hi": "N*(N+1)//2"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc480_e": {
+    "statement_sha256": "cd43c0cb5e2d26fc169a9f6177f468d6742859c3d1c00580b2246ccd7a7ae0e2",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 1000000000000000000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 1000000000000000000
+          }
+        ]
+      }
+    ]
+  },
+  "abc480_f": {
+    "statement_sha256": "9dfc686e2798a4679375cb9c6b71e044b5067917faf7d61217885b55f68d45df",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 20,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 20,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 100
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": 1000000000,
+        "mode": "sum_mod",
+        "mod": "M"
+      }
+    ]
+  },
+  "abc479_b": {
+    "statement_sha256": "83dd1eecc23e112c99b029861209f96e4e8ef89347557e8df48a3b18b81bd4a2",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "S",
+            "alphabet": "SR",
+            "length": "N"
+          }
+        ]
+      }
+    ]
+  },
+  "abc479_c": {
+    "statement_sha256": "e7803c234a686e5cebffb74cf07e26d1e53e2486648188006a7fc361f2c51c62",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 20,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 20,
+            "count": true
+          },
+          {
+            "name": "W",
+            "lo": 1,
+            "hi": 1000000000
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "N",
+        "variants": [
+          [
+            {
+              "name": "A",
+              "lo": 1,
+              "hi": 1000000000
+            },
+            {
+              "name": "B",
+              "lo": 1,
+              "hi": 1000000000
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc479_d": {
+    "statement_sha256": "e3eb602ea8f9c46c474c1b6a861eb94fb6621ead4e624b649ab7cfd2ac4f3904",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 300000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 300000,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 300000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N-1",
+        "lo": 1,
+        "hi": 1000000000
+      },
+      {
+        "op": "array",
+        "n": "N-1",
+        "lo": 1,
+        "hi": 1000000000
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "s",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "t",
+              "lo": 1,
+              "hi": "N",
+              "exclude": [
+                "s"
+              ]
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc479_e": {
+    "statement_sha256": "53f07b876169d77661feb483ad53911051c5394f7b18a159f944d0a1fc8eeb97",
+    "size_name": "N",
+    "size_min": 3,
+    "size_max": 199999,
+    "primary_step": 2,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 3,
+            "hi": 199999,
+            "count": true,
+            "step": 2
+          }
+        ]
+      },
+      {
+        "op": "tree",
+        "n": "N",
+        "ordered": true
+      }
+    ]
+  },
+  "abc479_f": {
+    "statement_sha256": "271013772cd16082abd4cea703e78f0b67fae7321b36896a33d2731345f0b1af",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 0,
+        "hi": 1000000000,
+        "mode": "unique"
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 0,
+        "hi": 1000000000,
+        "mode": "unique"
+      }
+    ]
+  },
+  "abc479_g": {
+    "statement_sha256": "826cf1f885457eadb772da2e2ef47e2151e3e5daf44ecc7112643829334af1d5",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": -1000000,
+        "hi": 1000000
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": -1000000,
+        "hi": 1000000
+      }
+    ]
+  },
+  "abc478_a": {
+    "statement_sha256": "2c7f638e6434b6a34c9c5c8a4c4ba1f2842c2268f5b848c57157f7c88d52926f",
+    "size_name": "M",
+    "size_min": 1,
+    "size_max": 10000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 10000
+          }
+        ]
+      }
+    ]
+  },
+  "abc478_b": {
+    "statement_sha256": "d6e3218a8add3d8fe0ffe46f19158fc6e871c25e7bcf478a66dead7d7545a1e5",
+    "size_name": "N",
+    "size_min": 3,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 3,
+            "hi": 100,
+            "count": true
+          },
+          {
+            "name": "V",
+            "lo": 6,
+            "hi": "3*N-3"
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": 1000000
+      }
+    ]
+  },
+  "abc478_c": {
+    "statement_sha256": "9903713da78da40689879becca8eb0e92034f2c04aee174acaa98381edbe31fd",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "K",
+            "lo": 1,
+            "hi": "N-1"
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "N"
+      }
+    ]
+  },
+  "abc478_d": {
+    "statement_sha256": "7aa7769a17c681bd9f82125b9b3c819459f4cf351e71943c8ed00f8d95e0263a",
+    "size_name": "Q",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "L",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "R",
+              "lo": "L",
+              "hi": "N"
+            },
+            {
+              "name": "X",
+              "lo": 1,
+              "hi": "Q"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc478_e": {
+    "statement_sha256": "cfcb6da5c1a88b9e0638a205b5d0c8b4e0ac15ebe0b802bf35e4d93db6e950b1",
+    "size_name": "Q",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "t",
+              "lo": 0,
+              "hi": 1
+            },
+            {
+              "name": "u",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "v",
+              "lo": 1,
+              "hi": "N"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc478_f": {
+    "statement_sha256": "899ec8484c4a0a2f297e6d01ab342b6edce3054c8cde0028ac26b6bb02738715",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "N",
+        "mode": "permutation",
+        "prefix": [
+          1
+        ]
+      }
+    ]
+  },
+  "abc478_g": {
+    "statement_sha256": "3763ff230d60d07e2d6d79831a77613643c7bce9bea2be1d442b218712f7249e",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 100000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 100000,
+            "count": true
+          },
+          {
+            "name": "p",
+            "lo": 1,
+            "hi": 9
+          },
+          {
+            "name": "q",
+            "lo": "p+1",
+            "hi": 10
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "N",
+        "variants": [
+          [
+            {
+              "name": "X",
+              "lo": -10000000,
+              "hi": 10000000
+            },
+            {
+              "name": "Y",
+              "lo": -10000000,
+              "hi": 10000000
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc477_a": {
+    "statement_sha256": "f356f74e5a1cad3565b869c299d0bb767528d265ce1430738dbcc9c69c64bfa1",
+    "size_name": "size",
+    "size_min": 1,
+    "size_max": 1,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "c",
+            "alphabet": "BYR",
+            "length": 1
+          }
+        ]
+      }
+    ]
+  },
+  "abc477_b": {
+    "statement_sha256": "c277fc3db5a3750becc32efb7e9b7c90f342fea6a0d6eb8cd484629b619c4169",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 100,
+            "count": true
+          },
+          {
+            "name": "D",
+            "lo": 1,
+            "hi": 1000000000
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": 1000000000
+      }
+    ]
+  },
+  "abc477_c": {
+    "statement_sha256": "ad7d7420b342eae56b90067a0a25f9ef9806c7139b08df86a9534649e56783b7",
+    "size_name": "Q",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "S",
+            "alphabet": "lowercase",
+            "lo": 1,
+            "hi": 400000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "T",
+            "alphabet": "lowercase",
+            "lo": 1,
+            "hi": 10
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "L",
+              "lo": 1,
+              "hi": "S_len"
+            },
+            {
+              "name": "R",
+              "lo": "L",
+              "hi": "S_len"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc477_d": {
+    "statement_sha256": "8e6a8e4cb574cc048a826a6daf4f995828692b8d9a3099d48884274cb1bd9c84",
+    "size_name": "Q",
+    "size_min": 1,
+    "size_max": 300000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 300000,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 300000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "literal": 1
+            },
+            {
+              "name": "X",
+              "lo": 1,
+              "hi": "N"
+            }
+          ],
+          [
+            {
+              "literal": 2
+            },
+            {
+              "name": "C",
+              "alphabet": "lowercase",
+              "length": 1
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc477_e": {
+    "statement_sha256": "aa0c64a9f3d4dac49f62001643baa434103e1c0a2631ffc722f6725630531a75",
+    "size_name": "N",
+    "size_min": 3,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 3,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": 1000000000
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": 1000000000
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "S",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "T",
+              "lo": "S+1",
+              "hi": "N+1"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc477_f": {
+    "statement_sha256": "495153454fcb0992478fb566eda1767ebaeebe091a196224eb9d3ad1f9e8ba39",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 200000
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "N",
+        "variants": [
+          [
+            {
+              "name": "L",
+              "lo": 1,
+              "hi": "M"
+            },
+            {
+              "name": "R",
+              "lo": "L",
+              "hi": "M"
+            }
+          ]
+        ]
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "A",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "B",
+              "lo": "A",
+              "hi": "N"
+            },
+            {
+              "name": "C",
+              "lo": 1,
+              "hi": "M"
+            },
+            {
+              "name": "D",
+              "lo": "C",
+              "hi": "M"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc477_g": {
+    "statement_sha256": "c1d406071effa2ccb0b3b74272694d6f26ccb2d8ef8877df2af55450499c75c5",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "Q",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "N"
+      },
+      {
+        "op": "tree",
+        "n": "N",
+        "ordered": true
+      },
+      {
+        "op": "rows",
+        "n": "Q",
+        "variants": [
+          [
+            {
+              "name": "s",
+              "lo": 1,
+              "hi": "N-1"
+            },
+            {
+              "name": "t",
+              "lo": "s+1",
+              "hi": "N"
+            },
+            {
+              "name": "a",
+              "lo": 1,
+              "hi": "N"
+            },
+            {
+              "name": "b",
+              "lo": "a",
+              "hi": "N"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc476_a": {
+    "statement_sha256": "58aff8e4970b4ad62dce87d822d0de6d22fb8070efef3ababe69beb7439df79e",
+    "size_name": "S_len",
+    "size_min": 1,
+    "size_max": 10,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "set",
+        "fields": [
+          {
+            "name": "S_len",
+            "lo": 1,
+            "hi": 10,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "S",
+            "alphabet": "lowercase",
+            "length": "S_len"
+          }
+        ]
+      }
+    ]
+  },
+  "abc476_b": {
+    "statement_sha256": "6b3b42808da6490d92a972e510c2465efda01258c35e6a33e5f19cb88d93ef12",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 100,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 100,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "S",
+            "alphabet": "lowercase",
+            "length": "N"
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "T",
+            "alphabet": "abcdefghijklmnopqrstuvwxyz*",
+            "length": "N"
+          }
+        ]
+      }
+    ]
+  },
+  "abc476_d": {
+    "statement_sha256": "31bb313451cce5e29251e6e5fbddcf1b322dac2a8fbda398ad4d6b77894380e9",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "K",
+            "lo": 2,
+            "hi": 1000000000
+          }
+        ]
+      },
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "X",
+            "lo": 0,
+            "hi": 1000000000000000
+          },
+          {
+            "name": "Y",
+            "lo": 0,
+            "hi": 1000000000
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": 1000000000
+      },
+      {
+        "op": "array",
+        "n": "M",
+        "lo": 1,
+        "hi": 1000000000
+      }
+    ]
+  },
+  "abc476_e": {
+    "statement_sha256": "37077cd32c956440c5dd933e66d1d8a1f51b44dca54636c41a3ddcaf1c831029",
+    "size_name": "N",
+    "size_min": 2,
+    "size_max": 200000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 2,
+            "hi": 200000,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 1,
+            "hi": 200000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "N",
+        "mode": "permutation"
+      },
+      {
+        "op": "rows",
+        "n": "M",
+        "variants": [
+          [
+            {
+              "name": "L",
+              "lo": 1,
+              "hi": "N-1"
+            },
+            {
+              "name": "R",
+              "lo": "L+1",
+              "hi": "N"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "abc476_f": {
+    "statement_sha256": "c79a8f9f9031927c4f941551f8c668d3ef7b452bee17ccf16883c7e96b446b6f",
+    "size_name": "N",
+    "size_min": 1,
+    "size_max": 1500,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "N",
+            "lo": 1,
+            "hi": 1500,
+            "count": true
+          },
+          {
+            "name": "M",
+            "lo": 2,
+            "hi": 2000000
+          }
+        ]
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "M-1"
+      },
+      {
+        "op": "array",
+        "n": "N",
+        "lo": 1,
+        "hi": "M-1"
+      }
+    ]
+  },
+  "abc476_g": {
+    "statement_sha256": "e721a12a9763dd144e2a7ea93068084a7bb9a85a512661a59c14d5319dfe1ed2",
+    "size_name": "T",
+    "size_min": 1,
+    "size_max": 10000,
+    "primary_step": 1,
+    "steps": [
+      {
+        "op": "line",
+        "fields": [
+          {
+            "name": "T",
+            "lo": 1,
+            "hi": 10000,
+            "count": true
+          }
+        ]
+      },
+      {
+        "op": "cases",
+        "n": "T",
+        "steps": [
+          {
+            "op": "line",
+            "fields": [
+              {
+                "name": "L",
+                "lo": 1,
+                "hi": 1000000000000000000
+              },
+              {
+                "name": "R",
+                "lo": "L",
+                "hi": 1000000000000000000
+              }
+            ]
+          }
+        ],
+        "budgets": {},
+        "subtract": {}
+      }
+    ]
+  }
+}

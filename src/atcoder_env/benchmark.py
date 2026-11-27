@@ -356,6 +356,13 @@ def benchmark(
 
     try:
         with case_module(config.root) as module:
+            independent_cases = getattr(module, "official_corpus", False)
+            if getattr(module, "interactive_corpus", False):
+                raise ValueError("Interactive AHC requires the official local tester, not ac bench")
+            if independent_cases:
+                logger.info(
+                    "Official AHC corpus: size is input index, not input dimension; resource shrinking is unavailable"
+                )
             generator = getattr(module, "benchmark_case", None)
             if not callable(generator):
                 raise ValueError("cases.py must define benchmark_case(size, seed)")
@@ -395,7 +402,7 @@ def benchmark(
                     raise ValueError("benchmark_patterns(size) must not repeat pattern names")
                 seen: dict[bytes, dict] = {}
                 for family in patterns:
-                    if family in blocked and size >= blocked[family]:
+                    if not independent_cases and family in blocked and size >= blocked[family]:
                         skipped.append(
                             {"size": size, "pattern": family, "reason": "earlier_failure"}
                         )

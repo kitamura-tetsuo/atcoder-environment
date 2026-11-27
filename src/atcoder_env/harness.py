@@ -153,6 +153,10 @@ def stress(
     logger.info("Stress execution: {} solution/oracle processes", mode)
 
     with case_module(config.root) as module, PairedRunner(config, parallel=parallel) as paired:
+        if getattr(module, "official_corpus", False):
+            raise ValueError(
+                "AHC scores and feasible outputs require the official tester/visualizer; ac stress cannot compare them as exact answers"
+            )
 
         def evaluate(case: object, *, enforce_budget: bool = True):
             nonlocal count, first, latest, target_signature, last_progress

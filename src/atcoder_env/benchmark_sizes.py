@@ -35,6 +35,12 @@ def choose_benchmark_sizes(root: Path, explicit_sizes: list[int] | None = None) 
 
     minimum, maximum = constraints.size_min, constraints.size_max
     if explicit_sizes is not None:
+        if constraints.size_name == "official_case_index" and any(
+            size > maximum for size in explicit_sizes
+        ):
+            raise ValueError(
+                f"Official AHC case indices must be in 1..{maximum}; no extrapolation is possible"
+            )
         for size in explicit_sizes:
             if not minimum <= size <= maximum:
                 logger.warning(
@@ -46,6 +52,9 @@ def choose_benchmark_sizes(root: Path, explicit_sizes: list[int] | None = None) 
                     maximum,
                 )
         return list(explicit_sizes)
+
+    if callable(getattr(constraints, "default_benchmark_sizes", None)):
+        return constraints.default_benchmark_sizes()
 
     sizes = {minimum, maximum}
     power = 10

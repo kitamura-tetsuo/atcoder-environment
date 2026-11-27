@@ -22,7 +22,9 @@ from sympy.parsing.latex import parse_latex
 
 from atcoder_env.constraint_model import IntegerArrayConstraints
 from atcoder_env.graph_constraints import GraphConstraints
+from atcoder_env.reviewed_constraints import lookup
 from atcoder_env.string_constraints import StringConstraints
+from atcoder_env.structured_constraints import StructuredConstraints
 
 MAX_VALUE = 10**18
 MAX_EXPRESSION_LENGTH = 256
@@ -38,11 +40,18 @@ _INTEGER_CLAUSE = re.compile(
 
 @dataclass(frozen=True)
 class ConstraintAnalysis:
-    spec: IntegerArrayConstraints | StringConstraints | GraphConstraints | None
+    spec: (
+        IntegerArrayConstraints
+        | StringConstraints
+        | GraphConstraints
+        | StructuredConstraints
+        | None
+    )
     input_format: str | None
     constraints: list[str]
     recognized: list[str]
     unsupported: list[str]
+    method: str = "parsed"
 
 
 class UnsupportedConstraint(ValueError):
@@ -691,16 +700,258 @@ def _graph_spec(
         return None
 
 
+def _infer_structured(
+    input_format: str, constraints: list[str], url: str, max_size: int
+) -> StructuredConstraints:
+    """Reuse oj-template's AST and SymPy bounds for independent integer fields."""
+    tree = oj_parser.run(input_format)
+    declared = oj_variables.list_declared_variables(tree)
+    if not isinstance(tree, SequenceNode):
+        raise UnsupportedConstraint("Unsupported structured AST")
+    layout = []
+    scalars = set()
+    dimensions = {}
+    fields = set()
+    line = []
+
+    def scalar_name(item):
+        name = str(item.name)
+        if name in fields or item.indices or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name):
+            raise UnsupportedConstraint("Invalid or repeated scalar")
+        scalars.add(name)
+        fields.add(name)
+        return name
+
+    def array_name(item, loop):
+        name = str(item.name)
+        dimension = str(loop.size)
+        if (
+            name in fields
+            or dimension not in scalars
+            or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name)
+            or list(map(str, item.indices)) != [f"{loop.name} + 1"]
+            or list(map(str, declared[name].dims)) != [dimension]
+            or list(map(str, declared[name].bases)) != ["1"]
+            or set(declared[name].depending) != {dimension}
+        ):
+            raise UnsupportedConstraint("Only complete one-based arrays over earlier scalars")
+        dimensions[name] = dimension
+        fields.add(name)
+        return name
+
+    for node in tree.items:
+        if isinstance(node, ItemNode):
+            if line and isinstance(line[0], tuple):
+                raise UnsupportedConstraint("Mixed array and scalar line")
+            line.append(scalar_name(node))
+        elif isinstance(node, NewlineNode):
+            if not line:
+                raise UnsupportedConstraint("Unexpected empty input line")
+            if isinstance(line[0], tuple):
+                if len(line) != 1:
+                    raise UnsupportedConstraint("Mixed array line")
+                name, dimension = line[0]
+                layout.append(("array", dimension, [name]))
+            else:
+                layout.append(("line", None, list(line)))
+            line = []
+        elif isinstance(node, LoopNode) and not line:
+            if isinstance(node.body, ItemNode):
+                name = array_name(node.body, node)
+                line.append((name, str(node.size)))
+            elif isinstance(node.body, SequenceNode):
+                items = node.body.items
+                if (
+                    len(items) < 3
+                    or not isinstance(items[-1], NewlineNode)
+                    or not all(isinstance(item, ItemNode) for item in items[:-1])
+                ):
+                    raise UnsupportedConstraint("Only complete fixed-width repeated rows")
+                names = [array_name(item, node) for item in items[:-1]]
+                layout.append(("rows", str(node.size), names))
+            else:
+                raise UnsupportedConstraint("Unsupported nested input loop")
+        else:
+            raise UnsupportedConstraint("Unsupported structured input layout")
+    if line or set(declared) != fields:
+        raise UnsupportedConstraint("Incomplete structured input layout")
+    if not fields:
+        raise UnsupportedConstraint("No input variables")
+
+    bounds = {name: {"lo": [], "hi": []} for name in fields}
+    integer_fields = set()
+
+    def identify(expr):
+        if isinstance(expr, sympy.Symbol):
+            name = str(expr)
+            if name in scalars:
+                return name, None
+            for field, dimension in dimensions.items():
+                index = _array_index(expr, field, dimension)
+                if index and index not in fields:
+                    return field, index
+        return None
+
+    for clause in constraints:
+        normalized = re.sub(r"\s*_\s*", "_", _normalize(clause)).removesuffix(".").strip()
+        if _INTEGER_CLAUSE.fullmatch(clause):
+            integer_fields.update(fields)
+            continue
+        typed = re.fullmatch(
+            r"([A-Za-z][A-Za-z0-9_]*(?:(?:,\s*| and )[A-Za-z][A-Za-z0-9_]*)*) (?:is an integer|are integers)",
+            normalized,
+        )
+        if typed:
+            names = set(re.split(r",\s*| and ", typed.group(1)))
+            if not names <= scalars:
+                raise UnsupportedConstraint("Unknown integer variable")
+            integer_fields.update(names)
+            continue
+        body, domain = _trailing_domain(normalized)
+        parts = re.split(r"(<=|>=|<|>)", body)
+        if not 3 <= len(parts) <= 9 or len(parts) % 2 != 1:
+            raise UnsupportedConstraint("Unsupported structured bound")
+        operands = [
+            [_parse_math(piece.strip()) for piece in part.split(",")] for part in parts[::2]
+        ]
+        domain_fields = set()
+        for i, op in enumerate(parts[1::2]):
+            lefts, rights = operands[i], operands[i + 1]
+            if len(lefts) > 1 and len(rights) > 1:
+                raise UnsupportedConstraint("Ambiguous grouped relation")
+            if op in (">", ">="):
+                lefts, rights = rights, lefts
+                op = "<" if op == ">" else "<="
+            for left in lefts:
+                for right in rights:
+                    lv, rv = identify(left), identify(right)
+                    if lv and rv:
+                        # A repeated field can depend on a scalar, but not on
+                        # another element or an unresolved scalar relationship.
+                        if (lv[1] is None) == (rv[1] is None):
+                            raise UnsupportedConstraint("Dependent scalar/row inequality")
+                        if lv[1] is not None:
+                            variable, side, endpoint = lv, "hi", rv[0]
+                        else:
+                            variable, side, endpoint = rv, "lo", lv[0]
+                        if op == "<":
+                            endpoint += "-1" if side == "hi" else "+1"
+                    elif lv or rv:
+                        variable, side, expr = (lv, "hi", right) if lv else (rv, "lo", left)
+                        endpoint = _endpoint(expr, lower=side == "lo", strict=op == "<")
+                    else:
+                        raise UnsupportedConstraint("Unrecognized variable in bound")
+                    name, index = variable
+                    if index is not None:
+                        domain_fields.add((index, dimensions[name]))
+                    bounds[name][side].append(endpoint)
+        if domain is not None:
+            if len(domain_fields) != 1:
+                raise UnsupportedConstraint(
+                    "Index annotation does not cover one complete dimension"
+                )
+            index, dimension = next(iter(domain_fields))
+            _verify_index_domain(domain, {index}, dimension)
+
+    if integer_fields != fields:
+        raise UnsupportedConstraint("Not every input variable is explicitly integer")
+    resolved = {}
+    for name, entries in bounds.items():
+        if not entries["lo"] or not entries["hi"]:
+            raise UnsupportedConstraint(f"Missing bounds for {name}")
+        combined = {}
+        for side, values in entries.items():
+            if all(type(v) is int for v in values):
+                combined[side] = (max if side == "lo" else min)(values)
+            elif len(set(values)) == 1:
+                combined[side] = values[0]
+            else:
+                raise UnsupportedConstraint("Ambiguous mixed bounds")
+        resolved[name] = combined
+    for name in scalars:
+        lo, hi = resolved[name]["lo"], resolved[name]["hi"]
+        if type(lo) is not int or type(hi) is not int or lo > hi:
+            raise UnsupportedConstraint("Scalar bounds must be independent constants")
+        if name in dimensions.values() and not 1 <= lo <= hi <= 10_000_000:
+            raise UnsupportedConstraint("Invalid/oversized repetition count")
+
+    def extremes(value):
+        if type(value) is int:
+            return value, value
+        match = re.fullmatch(r"([A-Za-z][A-Za-z0-9_]*)([+-]1)?", value)
+        if not match or match[1] not in scalars:
+            raise UnsupportedConstraint("Unknown dependent bound")
+        offset = int(match[2] or "0")
+        item = resolved[match[1]]
+        return item["lo"] + offset, item["hi"] + offset
+
+    for name in dimensions:
+        lo, hi = resolved[name]["lo"], resolved[name]["hi"]
+        # Require the field's domain to be nonempty for every allowed scalar
+        # combination. Correlated dependent endpoints are handled by recipes.
+        if lo == hi:
+            continue
+        if extremes(lo)[1] > extremes(hi)[0]:
+            raise UnsupportedConstraint("Dependent bounds may be infeasible")
+    steps = []
+    count_names = set(dimensions.values())
+    seen_scalars = set()
+    for kind, dimension, names in layout:
+        definitions = []
+        for name in names:
+            item = {"name": name, **resolved[name]}
+            for endpoint in (item["lo"], item["hi"]):
+                if isinstance(endpoint, str):
+                    dependency = re.fullmatch(r"([A-Za-z][A-Za-z0-9_]*)([+-]1)?", endpoint)
+                    if dependency is None or dependency[1] not in seen_scalars:
+                        raise UnsupportedConstraint("Dependent value precedes its bound")
+            if kind == "line":
+                seen_scalars.add(name)
+                if name in count_names:
+                    item["count"] = True
+            definitions.append(item)
+        if kind == "line":
+            steps.append({"op": "line", "fields": definitions})
+        elif kind == "array":
+            steps.append({"op": "array", "n": dimension, **definitions[0]})
+        else:
+            steps.append({"op": "rows", "n": dimension, "variants": [definitions]})
+    primary = next((name for _, _, names in layout for name in names if name in count_names), None)
+    if primary is None:
+        primary = next(
+            (
+                name
+                for _, _, names in layout
+                for name in names
+                if name in scalars and resolved[name]["lo"] >= 1
+            ),
+            "size",
+        )
+    limits = resolved[primary] if primary != "size" else {"lo": 1, "hi": 1}
+    return StructuredConstraints(primary, limits["lo"], limits["hi"], steps, max_size, url)
+
+
 def analyze_statement(html: bytes, url: str, *, max_size: int = 30) -> ConstraintAnalysis:
     """Extract a complete supported model, preserving every unresolved condition."""
     constraints: list[str] = []
     recognized: list[str] = []
     unsupported: list[str] = []
     input_format = None
+    english = None
 
     def result(
-        spec: IntegerArrayConstraints | StringConstraints | GraphConstraints | None = None,
+        spec: IntegerArrayConstraints
+        | StringConstraints
+        | GraphConstraints
+        | StructuredConstraints
+        | None = None,
     ) -> ConstraintAnalysis:
+        if spec is None and english is not None and input_format and constraints:
+            reviewed = lookup(english, url, max_size=max_size)
+            if reviewed is not None:
+                return ConstraintAnalysis(
+                    reviewed, input_format, constraints, list(constraints), [], "reviewed_schema"
+                )
         return ConstraintAnalysis(spec, input_format, constraints, recognized, unsupported)
 
     if type(max_size) is not int or not 1 <= max_size <= MAX_VALUE:
@@ -742,6 +993,16 @@ def analyze_statement(html: bytes, url: str, *, max_size: int = 30) -> Constrain
         input_format = oj_html.parse_input_format_string(str(english).encode("utf-8"), url=url)
         size_name, values_name, shape, *fields = _input_shape(input_format)
     except Exception as error:
+        if input_format:
+            try:
+                spec = _infer_structured(input_format, constraints, url, max_size)
+            except Exception:
+                # Upstream parser errors also mean the format is unsupported.
+                pass
+            else:
+                return ConstraintAnalysis(
+                    spec, input_format, constraints, list(constraints), [], "parsed_structured"
+                )
         unsupported.append(f"Unsupported input format: {error or type(error).__name__}")
         return result()
 
