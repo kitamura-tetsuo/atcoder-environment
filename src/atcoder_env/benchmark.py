@@ -43,6 +43,13 @@ def _hook(module: ModuleType, generator: Any, name: str):
     return getattr(module, name, None) or getattr(getattr(generator, "__self__", None), name, None)
 
 
+def _call_benchmark_hook(hook, *args, allow_out_of_range: bool = False, **kwargs):
+    """Opt in built-in generators while keeping custom cases.py hooks compatible."""
+    if allow_out_of_range and "allow_out_of_range" in inspect.signature(hook).parameters:
+        kwargs["allow_out_of_range"] = True
+    return hook(*args, **kwargs)
+
+
 def _profile_command(config: Config) -> list[str] | None:
     command = config.solution
     interpreter = shutil.which(command[0])
@@ -129,6 +136,7 @@ def _diagnose(
     shrink_budget: float,
     profile: bool,
     profile_timeout: float,
+    allow_out_of_range: bool,
     diagnostic: dict,
 ) -> None:
     target = session / witness.name
@@ -188,11 +196,22 @@ def _diagnose(
             witness.size,
             shrink_budget,
         )
-        strategy = strategy_factory(witness.size, seed, pattern=witness.pattern)
+        strategy = _call_benchmark_hook(
+            strategy_factory,
+            witness.size,
+            seed,
+            pattern=witness.pattern,
+            allow_out_of_range=allow_out_of_range,
+        )
         preliminary = None
         if "size_only" in inspect.signature(strategy_factory).parameters:
-            preliminary = strategy_factory(
-                witness.size, seed, pattern=witness.pattern, size_only=True
+            preliminary = _call_benchmark_hook(
+                strategy_factory,
+                witness.size,
+                seed,
+                pattern=witness.pattern,
+                size_only=True,
+                allow_out_of_range=allow_out_of_range,
             )
         reduction = minimize_resource_case(
             witness.case,
@@ -303,6 +322,7 @@ def benchmark(
         if sizes is not None
         else ("constraints.toml" if (config.root / "constraints.toml").exists() else "fallback")
     )
+    allow_out_of_range = sizes is not None
     sizes = choose_benchmark_sizes(config.root, sizes)
     logger.info("Benchmark sizes ({}): {}", source, ", ".join(map(str, sizes)))
     logger.info(
@@ -356,7 +376,11 @@ def benchmark(
                 coverage = "declared_patterns"
             for size in sizes:
                 patterns = (
-                    list(patterns_factory(size))
+                    list(
+                        _call_benchmark_hook(
+                            patterns_factory, size, allow_out_of_range=allow_out_of_range
+                        )
+                    )
                     if pattern == "all" and callable(patterns_factory)
                     else ["default" if pattern == "all" else pattern]
                 )
@@ -381,11 +405,19 @@ def benchmark(
                             "This cases.py does not support --pattern; add a pattern parameter"
                         )
                     case = (
-                        generator(size, seed)
+                        _call_benchmark_hook(
+                            generator, size, seed, allow_out_of_range=allow_out_of_range
+                        )
                         if family == "default"
-                        else generator(size, seed, pattern=family)
+                        else _call_benchmark_hook(
+                            generator,
+                            size,
+                            seed,
+                            pattern=family,
+                            allow_out_of_range=allow_out_of_range,
+                        )
                     )
-                    data = serialized(module, case)
+                    data = serialized(module, case, allow_out_of_range=allow_out_of_range)
                     digest = hashlib.sha256(data.encode("utf-8")).digest()
                     prefix = f"size-{size}" + ("" if family == "default" else f"-{family}")
                     if digest in seen:
@@ -496,7 +528,7 @@ def benchmark(
                     session,
                     witness,
                     strategy_factory,
-                    lambda case: serialized(module, case),
+                    lambda case: serialized(module, case, allow_out_of_range=allow_out_of_range),
                     execute,
                     seed=seed,
                     slow_seconds=slow_seconds,
@@ -505,6 +537,7 @@ def benchmark(
                     shrink_budget=shrink_budget,
                     profile=profile,
                     profile_timeout=profile_timeout,
+                    allow_out_of_range=allow_out_of_range,
                     diagnostic=diagnostic,
                 )
         completed = True

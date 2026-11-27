@@ -201,3 +201,53 @@ def test_custom_generator_retains_fallback_and_rejects_unsupported_pattern(tmp_p
     assert any("only its default distribution" in message for message in messages)
     with pytest.raises(ValueError, match="does not support --pattern"):
         benchmark(config, sizes=[2], repeat=1, seed=0, pattern="balanced")
+
+
+def test_array_explicit_size_exceeds_official_bounds_without_weaker_value_checks(
+    tmp_path: Path,
+) -> None:
+    config, model = array_workspace(tmp_path, "print('done')\n")
+    assert (
+        benchmark(
+            config,
+            sizes=[13],
+            repeat=1,
+            seed=0,
+            pattern="default",
+            profile=False,
+        )
+        == 0
+    )
+    session, summary = latest_benchmark(config)
+    assert summary["sizes"] == [13]
+    lines = (session / "size-13-run-1" / "input.txt").read_text().splitlines()
+    assert lines[0] == "13"
+    values = list(map(int, lines[1].split()))
+    assert len(values) == 13
+    assert set(values) <= set(range(1, 14))
+    assert len(set(values)) == 2
+    with pytest.raises(ValueError, match="official range"):
+        model.validate_case(values)
+    model.validate_case(values, allow_out_of_range=True)
+
+
+def test_array_out_of_range_benchmark_shrinking_remains_available(tmp_path: Path) -> None:
+    from hypothesis import find, settings
+
+    _, model = array_workspace(tmp_path, "print('done')\n")
+    strategy = model.benchmark_strategy(
+        15,
+        0,
+        pattern="balanced",
+        allow_out_of_range=True,
+    )
+    candidate = find(
+        strategy,
+        lambda case: len(case) > 12,
+        settings=settings(max_examples=100, deadline=None, database=None),
+    )
+    with pytest.raises(ValueError, match="official range"):
+        model.serialize(candidate)
+    assert model.serialize(candidate, allow_out_of_range=True).startswith(
+        str(len(candidate)) + "\n"
+    )

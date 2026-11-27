@@ -115,18 +115,39 @@ def test_string_stress_uses_the_same_validated_generator(
     assert not (session / "failure").exists()
 
 
-def test_string_out_of_range_size_is_rejected_before_user_code(
-    tmp_path: Path, string_problem: Path
+@pytest.mark.parametrize("size", [2, 300_001, 3_000_000])
+def test_string_out_of_range_manual_benchmark_runs_and_saves_input(
+    tmp_path: Path, string_problem: Path, size: int
 ) -> None:
-    for filename in ("main.py", "cases.py"):
-        (string_problem / filename).write_text(
-            "from pathlib import Path\n"
-            "Path('unexpected-execution').write_text('executed')\n"
-            "raise AssertionError('Invalid sizes must fail before executing user code')\n",
-            encoding="utf-8",
-        )
-    result = invoke(tmp_path, "bench", URL, "--sizes", "2,300001", "--repeat", "1")
-    assert result.returncode == 2, result.stdout + result.stderr
-    assert "outside the official N range 3..300000" in result.stdout
-    assert not (string_problem / "unexpected-execution").exists()
-    assert not (string_problem / ".ac" / "runs").exists()
+    (string_problem / "main.py").write_text(
+        "import sys\n"
+        "n, s = sys.stdin.read().splitlines()\n"
+        f"assert int(n) == {size} and len(s) == int(n)\n"
+        "assert set(s) <= set('ABC')\n"
+        "print(n)\n",
+        encoding="utf-8",
+    )
+    result = invoke(
+        tmp_path,
+        "bench",
+        URL,
+        "--sizes",
+        str(size),
+        "--pattern",
+        "default",
+        "--repeat",
+        "1",
+        "--no-profile",
+        "--no-shrink",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Benchmark size {size} is outside the official N range 3..300000" in result.stdout
+    session = next((string_problem / ".ac" / "runs").glob("*-bench-*"))
+    summary = json.loads((session / "summary.json").read_text())
+    assert summary["sizes"] == [size]
+    assert summary["sizes_source"] == "--sizes"
+    input_text = (session / f"size-{size}-run-1" / "input.txt").read_text()
+    length, string = input_text.splitlines()
+    assert int(length) == size == len(string)
+    assert set(string) <= set("ABC")
+    assert (session / f"size-{size}-run-1" / "actual.txt").read_text() == f"{size}\n"
