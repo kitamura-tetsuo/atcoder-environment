@@ -131,6 +131,8 @@ def test_memory_failure_is_reduced_without_changing_its_resource_reason(tmp_path
         "for _ in range(n):\n"
         "    blocks.append(bytearray(16 * 1024 * 1024))\n"
         "    time.sleep(0.005)\n"
+        # Keep the final allocation observable across several 10 ms RSS samples.
+        "time.sleep(0.1)\n"
         "print(n)\n"
     )
     config, model = array_workspace(tmp_path, source)
