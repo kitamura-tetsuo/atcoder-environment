@@ -75,6 +75,14 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("url")
     prepare.add_argument("--directory", "-d", type=Path)
     prepare.add_argument("--template", choices=("array", "tree"), default="array")
+    prepare.add_argument(
+        "--no-constraints",
+        action="store_true",
+        help="Download samples without importing constraints",
+    )
+    prepare.add_argument(
+        "--max-size", type=positive_int, default=30, help="Small-input size cap for stress tests"
+    )
     commands.add_parser("doctor", help="Check interpreters and installed integration tools offline")
 
     def problem_command(name: str, help_text: str, *, run_options: bool = False):
@@ -133,6 +141,12 @@ def build_parser() -> argparse.ArgumentParser:
     regression.add_argument("--name", required=True)
     download = problem_command("download", "Download samples into an existing problem workspace")
     download.add_argument("--url")
+    constraints = problem_command(
+        "constraints", "Import supported input constraints and a Hypothesis generator"
+    )
+    constraints.add_argument("--url", help="AtCoder task URL (defaults to atcoder.toml)")
+    constraints.add_argument("--max-size", type=positive_int, default=30)
+    constraints.add_argument("--html", type=Path, help="Read a saved English task page offline")
     problem_command("template", "Generate input-code drafts for manual review via oj-template")
     submission = problem_command(
         "submit", "Submit one source via oj with its interactive confirmation"
@@ -156,6 +170,8 @@ def doctor() -> int:
         "online-judge-tools",
         "online-judge-api-client",
         "online-judge-template-generator",
+        "sympy",
+        "antlr4-python3-runtime",
         "setuptools",
     ):
         logger.info("{}: {}", package, importlib.metadata.version(package))
@@ -196,10 +212,21 @@ def main(argv: list[str] | None = None) -> int:
             )
             configure_logging(root)
             logging_ready = True
-            logger.info(
-                "Created {}. Edit cases.py to match this problem's format and constraints.", root
-            )
-            return download_samples(load_config(root))
+            logger.info("Created {}", root)
+            config = load_config(root)
+            download_samples(config)
+            if args.no_constraints or args.template != "array":
+                logger.info("Edit cases.py to match this problem's format and constraints.")
+                return 0
+            from atcoder_env.constraints import import_constraints
+
+            result = import_constraints(config, max_size=args.max_size)
+            if result:
+                logger.warning(
+                    "Samples are ready; automatic constraints are incomplete. "
+                    "Review the report and edit cases.py before stress testing."
+                )
+            return result
         config = load_config(args.path)
         for option in ("solution", "oracle"):
             value = getattr(args, option, None)
@@ -235,6 +262,12 @@ def main(argv: list[str] | None = None) -> int:
             return promote(config, args.artifact, args.name)
         if args.action == "download":
             return download_samples(config, args.url)
+        if args.action == "constraints":
+            from atcoder_env.constraints import import_constraints
+
+            return import_constraints(
+                config, url=args.url, max_size=args.max_size, html_path=args.html
+            )
         if args.action == "template":
             return generate_templates(config)
         if args.action == "submit":

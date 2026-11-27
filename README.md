@@ -12,6 +12,7 @@ PythonでAtCoderに取り組むための、問題準備・サンプル実行・�
 | --- | --- |
 | 配列・木の問題用フォルダー作成 | `ac new` |
 | 問題URLから作業フォルダーとサンプルを準備 | `ac prepare` / online-judge-tools |
+| 対応する問題の制約を取り込み、生成器を作成 | `ac prepare` / `ac constraints` |
 | サンプル・保存した回帰テストの実行 | `ac test` |
 | 境界ケース・ランダム入力を愚直解と比較 | `ac stress` / Hypothesis |
 | 入力の制約を保ちながら反例を縮小 | `ac stress` の標準動作 |
@@ -24,7 +25,7 @@ PythonでAtCoderに取り組むための、問題準備・サンプル実行・�
 | 木・乱数用の追加ヘルパー | CYaRon / onlinejudge_random |
 | 提出 | `ac submit` / ojの対話的な確認付き |
 
-実行時に生成AIを呼ぶ機能はありません。問題固有の解答、正しい愚直解、入力制約は自分で記述します。
+実行時に生成AIを呼ぶ機能はありません。問題固有の解答と正しい愚直解は自分で記述します。入力制約は対応する形式なら自動で取り込み、未対応の場合は手動で記述します。
 
 ## まず動かす：Docker Compose
 
@@ -111,23 +112,92 @@ Linux/macOS、Python 3.11〜3.13、[uv](https://docs.astral.sh/uv/getting-starte
  ac new problems/tree-practice --template tree
 ```
 
-AtCoderのサンプルも取得する場合：
+AtCoderのサンプルと、対応する入力制約も取得する場合：
 
 ```bash
- ac prepare https://atcoder.jp/contests/abs/tasks/abc086_a
+ ac prepare https://atcoder.jp/contests/abc485/tasks/abc485_c
 ```
 
-既存のファイルは上書きしません。取得に失敗しても作業フォルダーは残り、後で `ac download <問題フォルダー>` で再試行できます。自分で `test/sample-1.in` と `test/sample-1.out` を置くこともできます。
+作成先は新規または空のフォルダーに限ります。取得に失敗しても作業フォルダーは残り、サンプルは `ac download <問題フォルダー>`、制約は `ac constraints <問題フォルダー>` で再試行できます。自分で `test/sample-1.in` と `test/sample-1.out` を置くこともできます。
 
 | ファイル | 自分で編集する内容 |
 | --- | --- |
 | `main.py` | 提出する高速な解答 |
 | `brute.py` | 小さい入力に対する、単純で正しい参照解 |
-| `cases.py` | 問題の入力形式・制約・境界ケース |
+| `constraints.toml` | 自動取り込みした公式制約と、小規模テスト用の上限 |
+| `cases.py` | 自動生成器への接続、または手書きの入力形式・制約・境界ケース |
 | `atcoder.toml` | 実行コマンド、時間制限、比較方法など |
 | `test/*.in`, `test/*.out` | サンプルと回帰テスト |
 
-**`ac prepare` は任意の問題の制約を推論しません。** 初期の `cases.py` は配列または木の例なので、対象問題に合わせて必ず修正してください。未実装の `main.py` / `brute.py` は `NotImplementedError` を出します。
+標準の配列テンプレートでは `ac prepare` が制約の取り込みも試みます。対応形式は後述の「制約の自動取り込み」の範囲に限り、**未対応の条件を読み飛ばして成功扱いにはしません**。未対応ならサンプルを残して終了コード2になり、初期の `cases.py` を対象問題に合わせて編集する必要があります。サンプルだけ取得する場合は `--no-constraints`、木の例を使う場合は `--template tree` を指定してください。未実装の `main.py` / `brute.py` は `NotImplementedError` を出します。
+
+### 制約の自動取り込み：ABC485 Cの例
+
+[ABC485 C — Different Neighbor](https://atcoder.jp/contests/abc485/tasks/abc485_c?lang=en) の入力は、要素数 `N` と長さ `N` の整数配列 `C` です。新規作成なら上の `ac prepare` だけで、既存の問題フォルダーなら次で取り込みます。
+
+```bash
+ ac constraints problems/abc485/abc485_c
+```
+
+公式制約は次の `constraints.toml` に変換されます。`max = "N"` は、そのケースの要素数を上限にする指定です。
+
+```toml
+version = 1
+
+[problem]
+url = "https://atcoder.jp/contests/abc485/tasks/abc485_c"
+
+[size]
+name = "N"
+min = 2
+max = 300000
+
+[values]
+name = "C"
+min = 1
+max = "N"
+min_distinct = 2
+
+[testing]
+max_size = 30
+```
+
+| 問題に書かれた条件 | 設定 |
+| --- | --- |
+| `2 ≤ N ≤ 3 × 10^5` | `[size] min = 2`, `max = 300000` |
+| `1 ≤ C_i ≤ N` | `[values] min = 1`, `max = "N"` |
+| 色が2種類以上 | `[values] min_distinct = 2` |
+| 入力はすべて整数 | 整数配列用の生成器を使用 |
+| 愚直解との比較を小さい入力で行う | `[testing] max_size = 30`（公式制約ではなくテスト設定） |
+
+`N` を選んだ後で `1..N` の値を生成するので、Hypothesisが `N` を縮小しても `C_i ≤ N` が保たれます。`min_distinct = 2` は「全要素が同じ」を除外します。先頭の2要素を異なる値に固定せず、長い同色区間も生成します。境界ケースには、端・中央の1個だけ色が違う配列、交互の配列、上限値を含む配列などを用意します。
+
+通常は `constraints.toml` を確認・調整すればよく、生成された `cases.py` を直接書く必要はありません。愚直解が十分速い場合は `[testing] max_size` を増やしてください。初回の取り込み時にも `--max-size 100` のように指定できます。
+
+```bash
+ ac stress problems/abc485/abc485_c --max-examples 1000 --seed 42
+ ac bench problems/abc485/abc485_c --sizes 1000,10000,300000 --seed 42
+```
+
+上の実行には `main.py` と `brute.py` の実装が必要です。差分テストの乱数・境界ケースは小規模上限を使い、`bench` は公式制約の範囲で指定サイズを使います。`bench` は愚直解を実行せず、生成器は長い同色区間を含む入力を作ります。
+
+#### 再利用するパーサーと対応範囲
+
+- 入力形式の解析：既存の [online-judge-template-generator](https://github.com/online-judge-tools/template-generator) の構文木を使用します。
+- 数式の解析：既存の [SymPy `parse_latex`](https://docs.sympy.org/latest/modules/parsing.html#sympy.parsing.latex.parse_latex) を `backend="antlr", strict=True` で使用します。SymPy 1.14.0 / ANTLRランタイム4.11.1に固定し、`3 \times 10^5` などを解釈します。LaTeXパーサー自体は上流でexperimental扱いのため、受け入れる構文を限定してテストしています。
+- この環境で追加した部分：不等式の上下限を入力変数に結び付ける処理、明示的に対応した自然言語条件、Hypothesisへの変換です。
+
+現版の対象は、**1行目が要素数、2行目が1始まりの整数配列**という入力です。要素数の上下限は整数定数、各要素の上下限は整数定数または要素数への参照に対応します。「少なくとも2種類の値」と「すべて整数」という英語の条件にも対応します。配列以外の構造、総和の条件、複雑な式による変数間依存、未対応の自然言語は自動生成の対象外です。
+
+解析には英語版の問題文を使用します。任意の問題文を理解する機能ではなく、入力形式とConstraints欄の対応済み条件を変換する処理です。問題文の別の場所に条件がある場合も含め、生成した設定は確認してください。
+
+`ac constraints` は解析に成功すると `constraints.toml` と `cases.py` を上書き更新します。解析元HTML、認識した条件、未解釈の条件、依存バージョンは `.ac/constraints/<ID>/report.json` と同じフォルダーに保存します。未解釈の条件があれば終了コード2となり、生成器は更新しません。
+
+英語版ページをHTMLとして保存しておけば、通信せず再解析できます。
+
+```bash
+ ac constraints problems/abc485/abc485_c --html saved-task.html
+```
 
 ### 2. サンプルを確認する
 
@@ -249,7 +319,7 @@ seed = 0
 | --- | --- |
 | `0` | 指定した検証・処理が成功 |
 | `1` | 解答のWA / RE / TLE / OLEを検出 |
-| `2` | 設定・生成器・参照解・外部ツールのエラー、探索未完了 |
+| `2` | 設定・生成器・参照解・外部ツールのエラー、探索未完了、制約の未対応・未反映 |
 | `130` | Ctrl+Cで中断 |
 
 `ac submit` は委譲先のojの終了コードを返します。
@@ -289,6 +359,7 @@ CIではPython 3.11 / 3.12 / 3.13、Docker Compose、実際の子プロセスに
 
 - [online-judge-tools](https://github.com/online-judge-tools/oj)
 - [online-judge-template-generator](https://github.com/online-judge-tools/template-generator)
+- [SymPy LaTeX parsing](https://docs.sympy.org/latest/modules/parsing.html)
 - [Hypothesis](https://hypothesis.readthedocs.io/en/latest/)
 - [CYaRon](https://github.com/luogu-dev/cyaron)
 

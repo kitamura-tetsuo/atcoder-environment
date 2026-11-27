@@ -85,6 +85,8 @@ jobs:
         run: |
           docker compose run --rm -T dev ac new problems/container-smoke
           test "$(stat -c %u problems/container-smoke/main.py)" -eq "$(id -u)"
+          docker compose run --rm -T dev ac constraints problems/container-smoke --url https://atcoder.jp/contests/abc485/tasks/abc485_c --html tests/fixtures/abc485_c_constraints.html
+          test "$(stat -c %u problems/container-smoke/constraints.toml)" -eq "$(id -u)"
       - name: Clean up containers and volumes
         if: always()
         run: docker compose down --volumes
