@@ -9,8 +9,10 @@ import signal
 import subprocess
 import time
 from collections.abc import Sequence
+from concurrent.futures import CancelledError
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from threading import Event
 from typing import Any
 
 
@@ -44,6 +46,7 @@ def run_program(
     cwd: Path,
     timeout: float = 2.0,
     output_limit: int = 1_048_576,
+    cancel_event: Event | None = None,
 ) -> RunResult:
     """Run a program on POSIX with a wall deadline and combined output byte cap.
 
@@ -51,6 +54,7 @@ def run_program(
     by switching between stdout and stderr. Streams are decoded as UTF-8 with
     replacement. This is a local test runner, not an untrusted-code sandbox.
     RSS is unavailable rather than inferred from cumulative child statistics.
+    Cancellation raises CancelledError after stopping the whole process group.
     """
     if os.name != "posix":
         raise RuntimeError("The local runner requires Linux, macOS, or WSL; use Docker on Windows.")
@@ -64,6 +68,8 @@ def run_program(
     if isinstance(output_limit, bool) or not isinstance(output_limit, int) or output_limit <= 0:
         raise ValueError("output_limit must be a positive integer")
 
+    if cancel_event is not None and cancel_event.is_set():
+        raise CancelledError("Execution cancelled before launch")
     encoded_input = input_data.encode("utf-8")
     started = time.monotonic()
     deadline = started + timeout
@@ -125,6 +131,8 @@ def run_program(
             process.stdin.close()
 
         while True:
+            if cancel_event is not None and cancel_event.is_set():
+                raise CancelledError("Execution cancelled")
             returncode = process.poll()
             now = time.monotonic()
             if returncode is not None and cleanup_deadline is None:
