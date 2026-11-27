@@ -21,6 +21,7 @@ from atcoder_env.benchmark import benchmark as benchmark
 from atcoder_env.config import Config
 from atcoder_env.paired_runner import PairedRunner
 from atcoder_env.runner import RunResult, run_program, verdict
+from atcoder_env.workspace import require_configured_generator
 
 
 class OracleFailure(Exception):
@@ -38,8 +39,7 @@ class StopShrinking(Exception):
 @contextmanager
 def case_module(root: Path):
     filename = root / "cases.py"
-    if not filename.is_file():
-        raise ValueError(f"Missing {filename}; create strategy() and serialize(case) first")
+    require_configured_generator(filename)
     name = "_atcoder_cases_" + uuid4().hex
     spec = importlib.util.spec_from_file_location(name, filename)
     if spec is None or spec.loader is None:
@@ -135,6 +135,7 @@ def stress(
     budget: float = 60.0,
     parallel: bool = True,
 ) -> int:
+    require_configured_generator(config.root / "cases.py")
     session = new_session(config, "stress")
     started = time.monotonic()
     count = 0

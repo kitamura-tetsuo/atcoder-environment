@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import tomllib
 from importlib import resources
@@ -11,6 +12,37 @@ from urllib.parse import urlparse
 from atcoder_env.external import task_parts
 
 TEMPLATES = ("array", "tree")
+
+
+def require_configured_generator(filename: Path) -> None:
+    """Reject unchanged example generators, including existing legacy copies.
+
+    Templates are input-shape examples, not verified constraints for a problem.
+    Compare syntax before importing user code so formatting, comments, or a
+    different module description cannot make an unchanged scaffold look ready.
+    """
+    if not filename.is_file():
+        raise ValueError(f"Missing {filename}; create strategy() and serialize(case) first")
+
+    def canonical_source(source: str) -> str:
+        tree = ast.parse(source)
+        if ast.get_docstring(tree) is not None:
+            tree.body.pop(0)
+        return ast.dump(tree, include_attributes=False)
+
+    try:
+        current = canonical_source(filename.read_text(encoding="utf-8"))
+    except SyntaxError:
+        # Leave syntax diagnostics to the normal module import below.
+        return
+    for template in TEMPLATES:
+        source = resources.files("atcoder_env").joinpath("templates", template, "cases.py.tpl")
+        if current == canonical_source(source.read_text(encoding="utf-8")):
+            raise ValueError(
+                f"{filename} is the unchanged {template} example generator. "
+                "Run ac constraints <problem> to import supported constraints, or edit "
+                "cases.py to match this problem's input and constraints before stress/bench."
+            )
 
 
 def resolve_workspace(target: str, *, directory: Path | None = None) -> tuple[Path, str | None]:

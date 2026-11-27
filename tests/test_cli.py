@@ -69,12 +69,9 @@ def test_new_scaffold_cannot_silently_pass_stress(tmp_path: Path) -> None:
     assert created.returncode == 0, created.stdout + created.stderr
     result = invoke(tmp_path, "stress", "problem", "--max-examples", "1")
     assert result.returncode == 2
-    assert "ORACLE_RE" in result.stdout
-    sessions = list((tmp_path / "problem" / ".ac" / "runs").glob("*-stress-*"))
-    assert len(sessions) == 1
-    record = json.loads((sessions[0] / "summary.json").read_text())
-    assert record["status"] == "ERROR"
-    assert "NotImplementedError" in (sessions[0] / "oracle-error" / "stderr.txt").read_text()
+    assert "unchanged array example generator" in result.stdout
+    assert "ac constraints" in result.stdout
+    assert not (tmp_path / "problem" / ".ac" / "runs").exists()
 
 
 def test_new_never_overwrites_existing_solution(tmp_path: Path) -> None:

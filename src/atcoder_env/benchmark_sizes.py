@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from atcoder_env.constraint_model import IntegerArrayConstraints
+from atcoder_env.constraint_io import load_constraints
 
 _DEFAULT_SIZES = (100, 1_000, 10_000)
 
@@ -27,7 +27,7 @@ def choose_benchmark_sizes(root: Path, explicit_sizes: list[int] | None = None) 
     if not constraints_path.exists():
         return list(_DEFAULT_SIZES) if explicit_sizes is None else list(explicit_sizes)
     try:
-        constraints = IntegerArrayConstraints.from_toml(constraints_path)
+        constraints = load_constraints(constraints_path)
     except ValueError as error:
         raise ValueError(f"Invalid {constraints_path} for benchmark sizes: {error}") from error
 

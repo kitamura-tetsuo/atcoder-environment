@@ -151,7 +151,7 @@ def test_constraints_url_creates_and_imports_from_saved_html_without_samples(
     root = canonical_workspace(tmp_path)
     assert load_config(root).url == URL
     assert (root / "constraints.toml").is_file()
-    assert "IntegerArrayConstraints" in (root / "cases.py").read_text()
+    assert "load_constraints" in (root / "cases.py").read_text()
     assert not list((root / "test").glob("*.in"))
 
 

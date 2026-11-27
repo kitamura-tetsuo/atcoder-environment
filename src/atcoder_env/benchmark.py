@@ -23,6 +23,7 @@ from atcoder_env.bench_minimize import minimize_resource_case
 from atcoder_env.benchmark_sizes import choose_benchmark_sizes
 from atcoder_env.config import Config
 from atcoder_env.runner import RunResult, run_program, verdict
+from atcoder_env.workspace import require_configured_generator
 
 
 @dataclass
@@ -312,6 +313,7 @@ def benchmark(
     )
     if source == "fallback":
         logger.info("No constraints.toml; use --sizes to cover this problem's official bounds")
+    require_configured_generator(config.root / "cases.py")
     session = new_session(replace(config, memory_limit_mib=memory_limit_mib), "bench")
     rows: list[dict] = []
     skipped: list[dict] = []
