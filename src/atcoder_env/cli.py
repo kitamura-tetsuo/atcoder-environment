@@ -32,6 +32,7 @@ from atcoder_env.harness import (
     stress,
     test_samples,
 )
+from atcoder_env.official_corpus import is_heuristic
 from atcoder_env.runner import run_program
 from atcoder_env.workspace import create_workspace, resolve_workspace
 
@@ -199,6 +200,9 @@ def build_parser() -> argparse.ArgumentParser:
     constraints.add_argument("--url", help="AtCoder task URL (defaults to atcoder.toml)")
     constraints.add_argument("--max-size", type=positive_int, default=30)
     constraints.add_argument("--html", type=Path, help="Read a saved English task page offline")
+    constraints.add_argument(
+        "--tools-zip", type=Path, help="Official AHC local-tools archive for offline import"
+    )
     problem_command("template", "Generate input-code drafts for manual review via oj-template")
     submission = problem_command(
         "submit", "Submit one source via oj with its interactive confirmation"
@@ -256,6 +260,15 @@ def main(argv: list[str] | None = None) -> int:
             logging_ready = True
             logger.info("Created {}", root)
             config = load_config(root)
+            if is_heuristic(url):
+                if args.no_constraints:
+                    logger.info(
+                        "AHC workspace created; run ac constraints to import official inputs."
+                    )
+                    return 0
+                from atcoder_env.constraints import import_constraints
+
+                return import_constraints(config, max_size=args.max_size)
             download_samples(config)
             if args.no_constraints or args.template != "array":
                 logger.info("Edit cases.py to match this problem's format and constraints.")
@@ -350,7 +363,11 @@ def main(argv: list[str] | None = None) -> int:
             from atcoder_env.constraints import import_constraints
 
             return import_constraints(
-                config, url=args.url, max_size=args.max_size, html_path=args.html
+                config,
+                url=args.url,
+                max_size=args.max_size,
+                html_path=args.html,
+                tools_zip=args.tools_zip,
             )
         if args.action == "template":
             return generate_templates(config)

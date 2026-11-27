@@ -18,6 +18,12 @@ from atcoder_env.config import Config
 from atcoder_env.constraint_parser import ConstraintAnalysis, analyze_statement
 from atcoder_env.external import SOURCE_URL, task_parts
 from atcoder_env.graph_constraints import GraphConstraints
+from atcoder_env.official_corpus import (
+    download_archive,
+    install_corpus,
+    is_heuristic,
+    official_archive,
+)
 
 MAX_HTML_BYTES = 4 * 1024 * 1024
 GENERATED_CASES = f'''"""Input strategies generated from the adjacent constraints.toml file."""
@@ -138,6 +144,7 @@ def import_constraints(
     url: str | None = None,
     max_size: int = 30,
     html_path: Path | None = None,
+    tools_zip: Path | None = None,
 ) -> int:
     """Write a complete supported generator, or report unresolved constraints."""
     url = url or config.url
@@ -171,12 +178,58 @@ def import_constraints(
             html = fetch_statement(url)
         (folder / "statement.html").write_bytes(html)
         report["statement_sha256"] = hashlib.sha256(html).hexdigest()
+        if is_heuristic(url):
+            # The final-system-test task pages intentionally have no statement.
+            # Only alias a genuine empty A-Final page in the same contest.
+            page = BeautifulSoup(html, "html.parser")
+            source_task_url = url
+            if page.select_one(".lang-en") is None and task == contest + "_b":
+                title = page.title.get_text(" ", strip=True) if page.title else ""
+                if "A-Final" not in title or "System Test" not in title:
+                    raise ValueError("No English AHC statement; cannot identify a final-test alias")
+                if html_path is not None:
+                    raise ValueError(
+                        "For offline final-test import use the original A statement HTML"
+                    )
+                source_task_url = f"https://atcoder.jp/contests/{contest}/tasks/{contest}_a"
+                html = fetch_statement(source_task_url)
+                (folder / "source-statement.html").write_bytes(html)
+            source, interactive = official_archive(html, source_task_url)
+            if tools_zip is not None:
+                if tools_zip.stat().st_size > 64 * 1024 * 1024:
+                    raise ValueError("Official tools ZIP exceeds local download cap")
+                data = tools_zip.read_bytes()
+            elif html_path is not None:
+                raise ValueError("Offline AHC import requires --tools-zip FILE")
+            else:
+                data = download_archive(source)
+            model = install_corpus(config.root, url, source, data, interactive)
+            (config.root / "constraints.toml").write_text(model.to_toml(), encoding="utf-8")
+            bindings = GENERATED_CASES.replace(
+                "benchmark_strategy = _constraints.benchmark_strategy",
+                "official_corpus = True\ninteractive_corpus = _constraints.interactive",
+            )
+            (config.root / "cases.py").write_text(bindings, encoding="utf-8")
+            report.update(
+                status="INSTALLED",
+                method="official_corpus",
+                source_task_url=source_task_url,
+                source_url=source,
+                archive_sha256=model.archive_sha256,
+                input_count=model.count,
+                interactive=model.interactive,
+                offline_archive_supplied=tools_zip is not None,
+            )
+            return 0
+        if tools_zip is not None:
+            raise ValueError("--tools-zip is only for AHC official input archives")
         analysis = analyze_statement(html, url, max_size=max_size)
         report.update(
             input_format=analysis.input_format,
             constraints=analysis.constraints,
             recognized=analysis.recognized,
             unsupported=analysis.unsupported,
+            method=analysis.method,
         )
         if analysis.spec is None:
             report["status"] = "UNSUPPORTED"
@@ -187,6 +240,10 @@ def import_constraints(
             return 2
         spec = analysis.spec
         report["spec"] = asdict(spec)
+        if analysis.method == "reviewed_schema":
+            logger.info(
+                "Using a reviewed structured schema matched to the official statement fingerprint"
+            )
         (config.root / "constraints.toml").write_text(spec.to_toml(), encoding="utf-8")
         (config.root / "cases.py").write_text(GENERATED_CASES, encoding="utf-8")
         report["status"] = "INSTALLED"
