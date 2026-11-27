@@ -3,10 +3,39 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from importlib import resources
 from pathlib import Path
+from urllib.parse import urlparse
+
+from atcoder_env.external import task_parts
 
 TEMPLATES = ("array", "tree")
+
+
+def resolve_workspace(target: str, *, directory: Path | None = None) -> tuple[Path, str | None]:
+    """Resolve a local path or task URL using the same layout as ac prepare."""
+    if urlparse(target).scheme in {"http", "https"} or "://" in target:
+        contest, task = task_parts(target)
+        url = f"https://atcoder.jp/contests/{contest}/tasks/{task}"
+        if directory is not None:
+            return directory.expanduser(), url
+        current = Path.cwd()
+        if (current / "atcoder.toml").is_file():
+            try:
+                data = tomllib.loads((current / "atcoder.toml").read_text(encoding="utf-8"))
+                problem = data.get("problem", {})
+                current_url = problem.get("url") if isinstance(problem, dict) else None
+                if isinstance(current_url, str) and task_parts(current_url) == (contest, task):
+                    return current, url
+            except (OSError, ValueError):
+                # This is only a location hint. The selected workspace's full
+                # configuration is validated later by the command dispatcher.
+                pass
+        return Path("problems") / contest / task, url
+    if directory is not None:
+        raise ValueError("Use --directory with a task URL; pass a local path directly otherwise")
+    return Path(target).expanduser(), None
 
 
 def create_workspace(path: Path, *, url: str | None = None, template: str = "array") -> Path:

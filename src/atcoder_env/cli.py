@@ -31,7 +31,7 @@ from atcoder_env.harness import (
     test_samples,
 )
 from atcoder_env.runner import run_program
-from atcoder_env.workspace import create_workspace
+from atcoder_env.workspace import create_workspace, resolve_workspace
 
 
 def positive_int(value: str) -> int:
@@ -67,7 +67,10 @@ def build_parser() -> argparse.ArgumentParser:
     new = commands.add_parser(
         "new", help="Create a safe offline workspace with explicit TODO solutions"
     )
-    new.add_argument("path", type=Path)
+    new.add_argument(
+        "path", metavar="PATH_OR_URL", help="New problem directory or AtCoder task URL"
+    )
+    new.add_argument("--directory", "-d", type=Path, help="Workspace directory for a URL target")
     new.add_argument("--template", choices=("array", "tree"), default="array")
     prepare = commands.add_parser(
         "prepare", help="Create a workspace and download public sample cases"
@@ -89,10 +92,13 @@ def build_parser() -> argparse.ArgumentParser:
         command = commands.add_parser(name, help=help_text)
         command.add_argument(
             "path",
-            type=Path,
             nargs="?",
-            default=Path("."),
-            help="Problem directory (default: current directory)",
+            default=".",
+            metavar="PATH_OR_URL",
+            help="Problem directory or AtCoder task URL (default: current directory)",
+        )
+        command.add_argument(
+            "--directory", "-d", type=Path, help="Workspace directory for a URL target"
         )
         if run_options:
             command.add_argument(
@@ -190,26 +196,14 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     logging_ready = False
     try:
-        if args.action not in {"new", "prepare"}:
-            configure_logging(
-                args.path.resolve() if hasattr(args, "path") and args.path.is_dir() else None
-            )
-            logging_ready = True
         if args.action == "doctor":
-            return doctor()
-        if args.action == "new":
-            root = create_workspace(args.path, template=args.template)
-            configure_logging(root)
+            configure_logging()
             logging_ready = True
-            logger.info("Created {}. Edit main.py, brute.py, and cases.py before testing.", root)
-            return 0
+            return doctor()
         if args.action == "prepare":
-            contest, task = task_parts(args.url)
-            root = create_workspace(
-                args.directory or Path("problems") / contest / task,
-                url=args.url,
-                template=args.template,
-            )
+            task_parts(args.url)
+            destination, url = resolve_workspace(args.url, directory=args.directory)
+            root = create_workspace(destination, url=url, template=args.template)
             configure_logging(root)
             logging_ready = True
             logger.info("Created {}", root)
@@ -227,7 +221,39 @@ def main(argv: list[str] | None = None) -> int:
                     "Review the report and edit cases.py before stress testing."
                 )
             return result
-        config = load_config(args.path)
+        destination, url = resolve_workspace(args.path, directory=args.directory)
+        override_url = getattr(args, "url", None)
+        if url and override_url and task_parts(url) != task_parts(override_url):
+            raise ValueError("The positional task URL and --url must identify the same problem")
+        if args.action == "new":
+            root = create_workspace(destination, url=url, template=args.template)
+            configure_logging(root)
+            logging_ready = True
+            logger.info("Created {}. Edit main.py, brute.py, and cases.py before testing.", root)
+            return 0
+        created = False
+        if url and (
+            not destination.exists() or (destination.is_dir() and not any(destination.iterdir()))
+        ):
+            if args.action not in {"constraints", "download", "template"}:
+                raise ValueError(
+                    f"Problem workspace is not prepared: {destination}. Run: ac prepare {url}"
+                    + (f" --directory {destination}" if args.directory is not None else "")
+                )
+            destination = create_workspace(destination, url=url)
+            created = True
+        config = load_config(destination)
+        if url:
+            if config.url and task_parts(config.url) != task_parts(url):
+                raise ValueError(
+                    f"{config.root} is configured for {config.url}, not {url}. "
+                    "Select the matching workspace with --directory."
+                )
+            config.url = url
+        configure_logging(config.root)
+        logging_ready = True
+        if created:
+            logger.info("Created {}", config.root)
         for option in ("solution", "oracle"):
             value = getattr(args, option, None)
             if value is not None:

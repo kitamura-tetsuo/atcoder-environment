@@ -101,6 +101,26 @@ Linux/macOS、Python 3.11〜3.13、[uv](https://docs.astral.sh/uv/getting-starte
 
 以下の説明では `ac` と略記します。ホストからは `uv run --frozen ac`、コンテナーを起動せず直接呼ぶなら `docker compose run --rm dev ac` に置き換えてください。ネイティブWindowsではDockerまたはWSLを使ってください。
 
+## URLで問題を指定する
+
+問題フォルダーを指定するコマンドは、**問題URLでも指定できる**ようになっています。リポジトリのルートでは、例えば次の2つは同じ作業フォルダーを指定します。
+
+```bash
+ ac test https://atcoder.jp/contests/abc485/tasks/abc485_c
+ ac test problems/abc485/abc485_c
+```
+
+URLは、コマンドを実行した場所の `problems/<コンテストID>/<問題ID>` に対応します。すでにその問題の作業フォルダー内にいて、`atcoder.toml` のURLが一致している場合は、現在のフォルダーを使います。`?lang=en`、末尾の `/`、`#...` の有無で別の問題にはなりません。フォルダーの直接指定と、省略時の `.` も引き続き使えます。
+
+別の保存先を使う場合は、URLと一緒に `--directory`（`-d`）を指定します。
+
+```bash
+ ac prepare https://atcoder.jp/contests/abc485/tasks/abc485_c -d work/different-neighbor
+ ac stress https://atcoder.jp/contests/abc485/tasks/abc485_c -d work/different-neighbor
+```
+
+`ac new URL` はオフラインで作業フォルダーを作成します。`ac constraints URL`、`ac download URL`、`ac template URL` も作業フォルダーがなければ作成し、それぞれ制約取得・サンプル取得・コードの下書き生成を行います。`test`、`stress`、`bench`、`run`、`replay`、`promote`、`submit` は準備済みの作業フォルダーを使います。環境全体を確認する `ac doctor` に問題URLは不要です。
+
 ## 問題を解く流れ
 
 ### 1. 作業フォルダーを作る
@@ -118,7 +138,11 @@ AtCoderのサンプルと、対応する入力制約も取得する場合：
  ac prepare https://atcoder.jp/contests/abc485/tasks/abc485_c
 ```
 
-作成先は新規または空のフォルダーに限ります。取得に失敗しても作業フォルダーは残り、サンプルは `ac download <問題フォルダー>`、制約は `ac constraints <問題フォルダー>` で再試行できます。自分で `test/sample-1.in` と `test/sample-1.out` を置くこともできます。
+作成先は新規または空のフォルダーに限ります。取得に失敗しても作業フォルダーは残り、サンプルは `ac download <問題URL>`、制約は `ac constraints <問題URL>` で再試行できます。自分で `test/sample-1.in` と `test/sample-1.out` を置くこともできます。
+
+```bash
+ ac download https://atcoder.jp/contests/abc485/tasks/abc485_c
+```
 
 | ファイル | 自分で編集する内容 |
 | --- | --- |
@@ -133,10 +157,10 @@ AtCoderのサンプルと、対応する入力制約も取得する場合：
 
 ### 制約の自動取り込み：ABC485 Cの例
 
-[ABC485 C — Different Neighbor](https://atcoder.jp/contests/abc485/tasks/abc485_c?lang=en) の入力は、要素数 `N` と長さ `N` の整数配列 `C` です。新規作成なら上の `ac prepare` だけで、既存の問題フォルダーなら次で取り込みます。
+[ABC485 C — Different Neighbor](https://atcoder.jp/contests/abc485/tasks/abc485_c?lang=en) の入力は、要素数 `N` と長さ `N` の整数配列 `C` です。新規作成なら上の `ac prepare` でサンプルと一緒に取り込めます。制約だけを取得・更新する場合は次を実行します。
 
 ```bash
- ac constraints problems/abc485/abc485_c
+ ac constraints https://atcoder.jp/contests/abc485/tasks/abc485_c
 ```
 
 公式制約は次の `constraints.toml` に変換されます。`max = "N"` は、そのケースの要素数を上限にする指定です。
@@ -175,8 +199,8 @@ max_size = 30
 通常は `constraints.toml` を確認・調整すればよく、生成された `cases.py` を直接書く必要はありません。愚直解が十分速い場合は `[testing] max_size` を増やしてください。初回の取り込み時にも `--max-size 100` のように指定できます。
 
 ```bash
- ac stress problems/abc485/abc485_c --max-examples 1000 --seed 42
- ac bench problems/abc485/abc485_c --sizes 1000,10000,300000 --seed 42
+ ac stress https://atcoder.jp/contests/abc485/tasks/abc485_c --max-examples 1000 --seed 42
+ ac bench https://atcoder.jp/contests/abc485/tasks/abc485_c --sizes 1000,10000,300000 --seed 42
 ```
 
 上の実行には `main.py` と `brute.py` の実装が必要です。差分テストの乱数・境界ケースは小規模上限を使い、`bench` は公式制約の範囲で指定サイズを使います。`bench` は愚直解を実行せず、生成器は長い同色区間を含む入力を作ります。
@@ -196,13 +220,13 @@ max_size = 30
 英語版ページをHTMLとして保存しておけば、通信せず再解析できます。
 
 ```bash
- ac constraints problems/abc485/abc485_c --html saved-task.html
+ ac constraints https://atcoder.jp/contests/abc485/tasks/abc485_c --html saved-task.html
 ```
 
 ### 2. サンプルを確認する
 
 ```bash
- ac test problems/practice
+ ac test https://atcoder.jp/contests/abc485/tasks/abc485_c
 ```
 
 全入力に対して別々のプロセスを起動し、AC / WA / RE / TLE / OLEを表示します。テストが0件だった場合や `.out` が欠けている場合はエラーになります。
@@ -210,7 +234,7 @@ max_size = 30
 ### 3. 愚直解と比較して反例を探す
 
 ```bash
- ac stress problems/practice --max-examples 1000 --seed 42 --budget 120
+ ac stress https://atcoder.jp/contests/abc485/tasks/abc485_c --max-examples 1000 --seed 42 --budget 120
 ```
 
 `edge_cases()` を確認した後、Hypothesisの生成と縮小を実行します。境界ケースで失敗した場合も、同じ種類の失敗を起こす小さい入力を探します。
@@ -244,14 +268,20 @@ max_size = 30
 `<失敗ディレクトリー>` を実際に表示された `.../failure` のパスに置き換えてください。
 
 ```bash
- ac replay problems/practice '<失敗ディレクトリー>'
- ac promote problems/practice '<失敗ディレクトリー>' --name regression-001
- ac test problems/practice
+ ac replay https://atcoder.jp/contests/abc485/tasks/abc485_c '<失敗ディレクトリー>'
+ ac promote https://atcoder.jp/contests/abc485/tasks/abc485_c '<失敗ディレクトリー>' --name regression-001
+ ac test https://atcoder.jp/contests/abc485/tasks/abc485_c
 ```
 
 `replay` は保存した入力・期待値を**現在の解答**で実行します。保存したソースに自動で戻す処理はありません。`promote` 後は通常の `ac test` に含まれます。
 
-単独の入力は `ac run problems/practice --input input.txt` で実行できます。`--input` / `--expected` と、`replay` / `promote` の保存先パスは、コマンドを呼び出したディレクトリーから解決します。設定した解答・参照解のスクリプトは問題フォルダーを作業ディレクトリーとして実行します。
+単独の入力も問題URLを指定して実行できます。
+
+```bash
+ ac run https://atcoder.jp/contests/abc485/tasks/abc485_c --input input.txt
+```
+
+`--input` / `--expected` / `--html` と、`replay` / `promote` の保存先パスは、コマンドを呼び出したディレクトリーから解決します。設定した解答・参照解のスクリプトは問題フォルダーを作業ディレクトリーとして実行します。
 
 アプリ自身のログはLoguruで標準出力と `.ac/logs/ac.log` の両方に出し、日単位でローテーションします。問題フォルダーと `.ac/` はGit管理対象外です。
 
@@ -268,7 +298,7 @@ AtCoder本番とCPU、インタープリター、起動コストは異なりま�
 ## 入力コードの自動生成と追加ヘルパー
 
 ```bash
- ac template problems/abs/abc086_a
+ ac template https://atcoder.jp/contests/abs/tasks/abc086_a
 ```
 
 `oj-template` で生成した `main.py` と `generate.py` は `.ac/templates/<ID>/` に保存されます。既存の解答を置き換えず、自動実行もしません。生成コードの構文、入力形式、`TODO` の範囲を確認してから利用してください。上流の生成器には仮の範囲が入り、解析失敗時に巨大な配列を作るフォールバックもあるためです。
@@ -331,7 +361,7 @@ seed = 0
 ログイン済みのoj環境なら、次で提出できます。
 
 ```bash
- ac submit problems/abs/abc086_a --language '<AtCoderの言語ID>'
+ ac submit https://atcoder.jp/contests/abs/tasks/abc086_a --language '<AtCoderの言語ID>'
 ```
 
 ojの対話的な確認を残しており、自動承認はしません。言語IDはAtCoderの現在の言語一覧に合わせて指定してください。認証や提出に関する対話は、資格情報を保存しないよう実行ログには取り込みません。
