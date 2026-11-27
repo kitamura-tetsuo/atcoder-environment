@@ -79,7 +79,8 @@ def test_errors_and_output_limits_keep_oracle_precedence(
     tmp_path: Path, source: str, status: str, failed_role: str
 ) -> None:
     config = Config(root=tmp_path, solution=command("print(1)"), oracle=command("print(2)"))
-    config.output_limit = 100
+    # Traceback formatting differs across Python versions; only OLE needs a small cap.
+    config.output_limit = 100 if status == "output_limit" else 4096
     setattr(config, failed_role, command(source))
     with PairedRunner(config) as paired:
         actual, oracle = paired.run("")
