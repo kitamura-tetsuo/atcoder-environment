@@ -22,6 +22,7 @@ from atcoder_env.external import (
     submit,
     task_parts,
 )
+from atcoder_env.graph_constraints import GRAPH_PATTERNS
 from atcoder_env.harness import (
     OracleFailure,
     benchmark,
@@ -149,7 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     bench.add_argument("--seed", type=int)
     bench.add_argument(
         "--pattern",
-        choices=("all", *BENCHMARK_PATTERNS),
+        choices=("all", *dict.fromkeys((*BENCHMARK_PATTERNS, *GRAPH_PATTERNS))),
         default="all",
         help="Input distribution (default: all feasible declared patterns)",
     )
@@ -265,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
             if result:
                 logger.warning(
                     "Samples are ready; automatic constraints are incomplete. "
-                    "Review the report and edit cases.py before stress testing."
+                    "Follow the generator edit instructions above before stress/bench."
                 )
             return result
         destination, url = resolve_workspace(args.path, directory=args.directory)

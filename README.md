@@ -261,13 +261,59 @@ max_size = 30
 
 生成器は `N` と `S` を別々の行に出力し、文字列長と文字集合を検証します。ベンチマークは `3,10,100,1000,10000,100000,300000` を自動選択し、同じ文字の連続、交互、周期的な文字列、ブロック、乱数などを試します。文字列でもHypothesisによる差分テストと資源超過入力の縮小に対応します。
 
+### ラベル付きグラフの制約の自動取り込み：ABC485 Eの例
+
+```bash
+ac constraints https://atcoder.jp/contests/abc485/tasks/abc485_e
+ac bench https://atcoder.jp/contests/abc485/tasks/abc485_e
+```
+
+`N M` の行と、続く `M` 行の `U_i V_i C_i` を持つ入力に対応します。ABC485 E の `constraints.toml` には次の設定が生成されます。
+
+```toml
+version = 1
+
+[problem]
+url = "https://atcoder.jp/contests/abc485/tasks/abc485_e"
+
+[vertices]
+name = "N"
+min = 2
+max = 200000
+
+[edges]
+name = "M"
+min = 1
+max = 200000
+source = "U"
+target = "V"
+label = "C"
+endpoint_min = 1
+endpoint_max = "N"
+label_min = 1
+label_max = "M"
+allow_self_loops = false
+allow_parallel = true
+
+[testing]
+max_size = 30
+```
+
+頂点数と辺数は独立です。自己ループを生成せず、多重辺は許容します。差分テストでは両方の個数を `max_size` 以下に制限し、すべての辺の端点とラベルを再検証します。
+
+ベンチマークの `size` は辺数 M を意味します。既定の `--pattern all` は鎖状（`default`）、閉路（`cycle`）、入出力スター（`star_in` / `star_out`）、ハブに異なる色・同じ色・2色を集中（`hub_distinct` / `hub_same` / `hub_two`）、多重辺（`parallel`）、少ない頂点に多数の辺（`dense`）、最大頂点数と指定辺数（`sparse`）、乱数（`random`）を試します。時間・メモリ超過時は Hypothesis で辺数、頂点数、色数、seed を縮小します。公式上限を超える `--sizes` の指定は M だけを緩め、N の公式範囲は維持します。
+
+このモデルは端点がそれぞれ 1..N、ラベルが 1..M、自己ループ禁止が明示された3整数の辺リストに限ります。単純グラフ・連結性・木・追加の重み制約などを推測して読み飛ばすことはありません。
+
 #### 再利用するパーサーと対応範囲
 
 - 入力形式の解析：既存の [online-judge-template-generator](https://github.com/online-judge-tools/template-generator) の構文木を使用します。
 - 数式の解析：既存の [SymPy `parse_latex`](https://docs.sympy.org/latest/modules/parsing.html#sympy.parsing.latex.parse_latex) を `backend="antlr", strict=True` で使用します。SymPy 1.14.0 / ANTLRランタイム4.11.1に固定し、`3 \times 10^5` などを解釈します。LaTeXパーサー自体は上流でexperimental扱いのため、受け入れる構文を限定してテストしています。
 - この環境で追加した部分：不等式の上下限を入力変数に結び付ける処理、明示的に対応した自然言語条件、Hypothesisへの変換です。
 
-現版の対象は、**1行目がサイズ、2行目が1始まりの整数配列または同じ長さの文字列**という入力です。サイズの上下限は整数定数、配列の各要素の上下限は整数定数またはサイズへの参照に対応します。配列では「少なくとも2種類の値」と「すべて整数」という英語の条件にも対応します。文字列では、サイズが整数であることと、文字列の長さ・使用可能な文字が明示された英語の条件に対応します。文字の集合は `A, B, and C` のような1文字ずつの列挙に限ります。総和の条件、複雑な式による変数間依存、これら以外の構造や未対応の自然言語は自動生成の対象外です。
+現版の対象は、**1行目がサイズ、2行目が1始まりの整数配列または同じ長さの文字列**、および前述の**ラベル付き辺リスト**です。サイズの上下限は整数定数、配列の各要素の上下限は整数定数またはサイズへの参照に対応します。配列では「少なくとも2種類の値」と「すべて整数」という英語の条件にも対応します。文字列では、サイズが整数であることと、文字列の長さ・使用可能な文字が明示された英語の条件に対応します。文字の集合は `A, B, and C` のような1文字ずつの列挙に限ります。総和の条件、複雑な式による変数間依存、これら以外の構造や未対応の自然言語は自動生成の対象外です。
+
+自動取り込みに失敗した場合、ログと `report.json` の `manual_edits` に、対象の `cases.py` のパス、問題の実際の入力形式、公式制約の全項目、編集する関数名と役割を表示します。未対応の条件は読み飛ばさず、設定済みの生成器がない場合は `strategy()`、`serialize(case)`、`edge_cases()`、`benchmark_case(size, seed)` を問題に合わせて記述してください。分布を増やすには `benchmark_patterns(size)`、縮小するには `benchmark_strategy(max_size, seed, pattern=...)` も実装します。
 
 解析には英語版の問題文を使用します。任意の問題文を理解する機能ではなく、入力形式とConstraints欄の対応済み条件を変換する処理です。問題文の別の場所に条件がある場合も含め、生成した設定は確認してください。
 
@@ -484,7 +530,7 @@ def benchmark_strategy(max_size, seed, *, pattern="default"):
     ...
 ```
 
-`benchmark_strategy` がない場合、資源超過入力は保存しますが縮小済みとは表示しません。自動取り込みした整数配列・文字列は全フックに対応しており、以前生成した整数配列の `cases.py` も束縛済みモデル経由で新機能を使えます。
+`benchmark_strategy` がない場合、資源超過入力は保存しますが縮小済みとは表示しません。自動取り込みした整数配列・文字列・ラベル付き辺リストは全フックに対応しており、以前生成した整数配列の `cases.py` も束縛済みモデル経由で新機能を使えます。
 
 ## 入力コードの自動生成と追加ヘルパー
 

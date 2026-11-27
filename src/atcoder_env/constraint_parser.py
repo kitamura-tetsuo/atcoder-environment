@@ -21,6 +21,7 @@ from onlinejudge_template.types import ItemNode, LoopNode, NewlineNode, Sequence
 from sympy.parsing.latex import parse_latex
 
 from atcoder_env.constraint_model import IntegerArrayConstraints
+from atcoder_env.graph_constraints import GraphConstraints
 from atcoder_env.string_constraints import StringConstraints
 
 MAX_VALUE = 10**18
@@ -37,7 +38,7 @@ _INTEGER_CLAUSE = re.compile(
 
 @dataclass(frozen=True)
 class ConstraintAnalysis:
-    spec: IntegerArrayConstraints | StringConstraints | None
+    spec: IntegerArrayConstraints | StringConstraints | GraphConstraints | None
     input_format: str | None
     constraints: list[str]
     recognized: list[str]
@@ -183,7 +184,7 @@ def _endpoint(
     return result
 
 
-def _input_shape(input_format: str) -> tuple[str, str, str]:
+def _input_shape(input_format: str) -> tuple[str, ...]:
     try:
         tree = oj_parser.run(input_format)
         declared = oj_variables.list_declared_variables(tree)
@@ -191,7 +192,41 @@ def _input_shape(input_format: str) -> tuple[str, str, str]:
         raise UnsupportedConstraint(
             "Existing oj-template parser could not parse the input format"
         ) from error
-    shape_error = "Input must be a size line followed by exactly one array or string line"
+    # Reuse the oj-template AST for the repeated-row shape.
+    if isinstance(tree, SequenceNode) and len(tree.items) == 4:
+        vertex, edge, newline, loop = tree.items
+        if (
+            isinstance(vertex, ItemNode)
+            and not vertex.indices
+            and isinstance(edge, ItemNode)
+            and not edge.indices
+            and isinstance(newline, NewlineNode)
+            and isinstance(loop, LoopNode)
+            and str(loop.size) == str(edge.name)
+            and isinstance(loop.body, SequenceNode)
+            and len(loop.body.items) == 4
+            and isinstance(loop.body.items[-1], NewlineNode)
+        ):
+            fields = loop.body.items[:3]
+            if all(isinstance(item, ItemNode) and len(item.indices) == 1 for item in fields):
+                vertex_name, edge_name = str(vertex.name), str(edge.name)
+                names = [str(item.name) for item in fields]
+                if (
+                    len({vertex_name, edge_name, *names}) == 5
+                    and set(declared) == {vertex_name, edge_name, *names}
+                    and all(
+                        list(map(str, declared[name].dims)) == [edge_name]
+                        and list(map(str, declared[name].bases)) == ["1"]
+                        and set(declared[name].depending) == {edge_name}
+                        for name in names
+                    )
+                    and all(str(item.indices[0]) == f"{loop.name} + 1" for item in fields)
+                ):
+                    return vertex_name, edge_name, "graph", *names
+    shape_error = (
+        "Supported input formats are: size + one array/string line, or "
+        "two size variables followed by a repeated three-integer edge row"
+    )
     if not isinstance(tree, SequenceNode) or len(tree.items) != 4:
         raise UnsupportedConstraint(shape_error)
     scalar, first_newline, payload, last_newline = tree.items
@@ -502,6 +537,160 @@ def _string_spec(
         return None
 
 
+def _graph_spec(
+    constraints: list[str],
+    recognized: list[str],
+    unsupported: list[str],
+    *,
+    vertex_name: str,
+    edge_name: str,
+    fields: list[str],
+    max_size: int,
+    url: str,
+) -> GraphConstraints | None:
+    """Recognize the complete labeled-edge schema, without dropping unknown clauses."""
+    source, target, label = fields
+    dependencies = {source: vertex_name, target: vertex_name, label: edge_name}
+    names = [vertex_name, edge_name, *fields]
+    bounds: dict[tuple[str, str], list[int | str]] = {
+        (name, side): [] for name in names for side in ("lower", "upper")
+    }
+    integers = False
+    no_self_loops = False
+
+    def field_updates(body: str, domain: str | None, name: str):
+        dependency = dependencies[name]
+        updates = _bound_clause(body, dependency, name)
+        if not updates or any(kind != "values" for kind, _, _ in updates):
+            raise UnsupportedConstraint("Expected bounds on a repeated edge field")
+        indices = {
+            index
+            for left, _, right in _comparisons(body)
+            for operand in (left, right)
+            if (index := _array_index(operand, name, dependency)) is not None
+        }
+        if len(indices) != 1 or indices.intersection(names):
+            raise UnsupportedConstraint("Edge field bounds must use one independent row index")
+        if domain is not None:
+            _verify_index_domain(domain, indices, edge_name)
+        return [(name, side, value) for _, side, value in updates]
+
+    def parse_bounds(body: str, domain: str | None):
+        parts = re.split(r"(<=|>=|<|>)", body)
+        if len(parts) == 5 and "," in parts[2]:
+            # A grouped middle operand is an explicit conjunction of bounds.
+            # Only the two declared endpoints with the same row index qualify.
+            grouped = [item.strip() for item in parts[2].split(",")]
+            if len(grouped) != 2:
+                raise UnsupportedConstraint("Expected exactly two grouped endpoint variables")
+            left, right = map(_parse_math, grouped)
+            a = _array_index(left, source, vertex_name)
+            b = _array_index(right, target, vertex_name)
+            if a is None or b is None:
+                a = _array_index(right, source, vertex_name)
+                b = _array_index(left, target, vertex_name)
+                grouped.reverse()
+            if a is None or a != b or a in names:
+                raise UnsupportedConstraint("Grouped endpoint bounds must use the same row index")
+            updates = []
+            for name, atom in zip((source, target), grouped, strict=True):
+                updates.extend(field_updates("".join([*parts[:2], atom, *parts[3:]]), domain, name))
+            return updates
+        for name in fields:
+            try:
+                return field_updates(body, domain, name)
+            except UnsupportedConstraint:
+                pass
+        if domain is None:
+            for name in (vertex_name, edge_name):
+                try:
+                    updates = _bound_clause(body, name, "_unused")
+                    if updates and all(kind == "size" for kind, _, _ in updates):
+                        return [(name, side, value) for _, side, value in updates]
+                except UnsupportedConstraint:
+                    pass
+        raise UnsupportedConstraint("Expected a scalar bound or a bound on a declared edge field")
+
+    for clause in constraints:
+        try:
+            body, domain = _trailing_domain(_normalize(clause).removesuffix(".").strip())
+            if _INTEGER_CLAUSE.fullmatch(clause):
+                integers = True
+            elif re.search(r"\\(?:neq|ne)\b|!=|≠", body):
+                parts = re.split(r"\\(?:neq|ne)\b|!=|≠", body)
+                if len(parts) != 2:
+                    raise UnsupportedConstraint("Expected one endpoint inequality")
+                left, right = (_parse_math(part.strip()) for part in parts)
+                a, b = (
+                    _array_index(left, source, vertex_name),
+                    _array_index(right, target, vertex_name),
+                )
+                if a is None or b is None:
+                    a, b = (
+                        _array_index(right, source, vertex_name),
+                        _array_index(left, target, vertex_name),
+                    )
+                if a is None or a != b or a in names:
+                    raise UnsupportedConstraint(
+                        "Self-loop prohibition must compare the two endpoints at the same row index"
+                    )
+                if domain is not None:
+                    _verify_index_domain(domain, {a}, edge_name)
+                no_self_loops = True
+            else:
+                for name, side, value in parse_bounds(body, domain):
+                    bounds[name, side].append(value)
+            recognized.append(clause)
+        except UnsupportedConstraint as error:
+            unsupported.append(f"{clause}: {error}")
+    if not integers:
+        unsupported.append("Missing an explicit clause declaring all input values to be integers")
+    if not no_self_loops:
+        unsupported.append(f"Missing explicit {source}_i != {target}_i (self-loop prohibition)")
+    for (name, side), entries in bounds.items():
+        if not entries:
+            unsupported.append(f"Missing {side} bound for {name}")
+    if unsupported:
+        return None
+    try:
+        ranges = {
+            name: (max(bounds[name, "lower"]), min(bounds[name, "upper"]))
+            for name in (vertex_name, edge_name)
+        }
+        for name, dependency in dependencies.items():
+            low, high = ranges[dependency]
+            lower = _combined_bound(
+                bounds[name, "lower"], lower=True, size_name=dependency, size_min=low, size_max=high
+            )
+            upper = _combined_bound(
+                bounds[name, "upper"],
+                lower=False,
+                size_name=dependency,
+                size_min=low,
+                size_max=high,
+            )
+            if (lower, upper) != (1, dependency):
+                raise UnsupportedConstraint(
+                    f"{name} must have the supported complete range 1..{dependency}"
+                )
+        return GraphConstraints(
+            vertex_name,
+            *ranges[vertex_name],
+            edge_name,
+            *ranges[edge_name],
+            source,
+            target,
+            label,
+            max_size,
+            url,
+        )
+    except ValueError as error:
+        unsupported.append(
+            f"Constraints cannot be represented by the supported graph model: {error}"
+        )
+        return None
+
+
 def analyze_statement(html: bytes, url: str, *, max_size: int = 30) -> ConstraintAnalysis:
     """Extract a complete supported model, preserving every unresolved condition."""
     constraints: list[str] = []
@@ -510,7 +699,7 @@ def analyze_statement(html: bytes, url: str, *, max_size: int = 30) -> Constrain
     input_format = None
 
     def result(
-        spec: IntegerArrayConstraints | StringConstraints | None = None,
+        spec: IntegerArrayConstraints | StringConstraints | GraphConstraints | None = None,
     ) -> ConstraintAnalysis:
         return ConstraintAnalysis(spec, input_format, constraints, recognized, unsupported)
 
@@ -551,10 +740,24 @@ def analyze_statement(html: bytes, url: str, *, max_size: int = 30) -> Constrain
         # Restrict oj-template to the English subtree; it otherwise picks the
         # first matching heading, which can belong to the Japanese statement.
         input_format = oj_html.parse_input_format_string(str(english).encode("utf-8"), url=url)
-        size_name, values_name, shape = _input_shape(input_format)
+        size_name, values_name, shape, *fields = _input_shape(input_format)
     except Exception as error:
         unsupported.append(f"Unsupported input format: {error or type(error).__name__}")
         return result()
+
+    if shape == "graph":
+        return result(
+            _graph_spec(
+                constraints,
+                recognized,
+                unsupported,
+                vertex_name=size_name,
+                edge_name=values_name,
+                fields=fields,
+                max_size=max_size,
+                url=url,
+            )
+        )
 
     if shape == "string":
         return result(
