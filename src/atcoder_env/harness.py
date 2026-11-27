@@ -22,7 +22,9 @@ from hypothesis.errors import NoSuchExample
 from loguru import logger
 
 from atcoder_env.artifacts import new_session, save_case, write_json
+from atcoder_env.benchmark_sizes import choose_benchmark_sizes
 from atcoder_env.config import Config
+from atcoder_env.paired_runner import PairedRunner
 from atcoder_env.runner import RunResult, run_program, verdict
 
 
@@ -129,7 +131,13 @@ def test_samples(config: Config) -> int:
 
 
 def stress(
-    config: Config, *, max_examples: int, seed: int, shrink: bool = True, budget: float = 60.0
+    config: Config,
+    *,
+    max_examples: int,
+    seed: int,
+    shrink: bool = True,
+    budget: float = 60.0,
+    parallel: bool = True,
 ) -> int:
     session = new_session(config, "stress")
     started = time.monotonic()
@@ -138,16 +146,29 @@ def stress(
     latest = None
     target_signature = None
     search_state = "exhausted"
+    last_progress = started
+    mode = "parallel" if parallel else "sequential"
+    logger.info("Stress execution: {} solution/oracle processes", mode)
 
-    with case_module(config.root) as module:
+    with case_module(config.root) as module, PairedRunner(config, parallel=parallel) as paired:
 
         def evaluate(case: object, *, enforce_budget: bool = True):
-            nonlocal count, first, latest, target_signature
+            nonlocal count, first, latest, target_signature, last_progress
             if enforce_budget and time.monotonic() - started > budget:
                 raise SearchBudgetExceeded
             data = serialized(module, case)
             count += 1
-            oracle = execute(config, data, oracle=True)
+            actual, oracle = paired.run(data)
+            now = time.monotonic()
+            if now - last_progress >= 5.0:
+                elapsed = now - started
+                logger.info(
+                    "Progress: {} evaluations, {:.2f} evaluations/s, {:.1f}s elapsed",
+                    count,
+                    count / elapsed,
+                    elapsed,
+                )
+                last_progress = now
             if oracle.status != "ok":
                 status = "ORACLE_" + judge(config, oracle, "")
                 save_case(
@@ -160,7 +181,7 @@ def stress(
                     details={"stage": "oracle", "seed": seed, "evaluation": count},
                 )
                 raise OracleFailure(f"Oracle failed ({status}); see {session / 'oracle-error'}")
-            actual = execute(config, data)
+            assert actual is not None
             status = judge(config, actual, oracle.stdout)
             if status == "AC":
                 return None
@@ -242,16 +263,20 @@ def stress(
                     "evaluations": count,
                     "error": str(error),
                     "initial_failure_saved": first is not None,
+                    "execution": {"mode": mode, **paired.stats},
                 },
             )
             raise
 
     failure_path = None
+    execution = {"mode": mode, **paired.stats}
     if latest is not None:
         data, actual, oracle, status = latest
         # Budget and explicit-edge failures need the same reproduction check as shrinking.
         checked_oracle = execute(config, data, oracle=True)
         checked_actual = execute(config, data)
+        execution["solution_seconds"] += checked_actual.elapsed_seconds
+        execution["oracle_seconds"] += checked_oracle.elapsed_seconds
         count += 1
         checked_status = judge(config, checked_actual, checked_oracle.stdout)
         if (
@@ -276,6 +301,7 @@ def stress(
                     "seed": seed,
                     "evaluations": count,
                     "error": "Failure did not reproduce",
+                    "execution": execution,
                 },
             )
             raise ValueError(
@@ -296,6 +322,8 @@ def stress(
         show_failure(actual, oracle.stdout)
     complete = search_state != "budget_exceeded"
     outcome = "FAIL" if first is not None else ("PASS" if complete else "INCOMPLETE")
+    elapsed = time.monotonic() - started
+    rate = count / elapsed if elapsed else 0.0
     write_json(
         session / "summary.json",
         {
@@ -304,11 +332,20 @@ def stress(
             "max_examples": max_examples,
             "evaluations": count,
             "search_state": search_state,
-            "elapsed_seconds": time.monotonic() - started,
+            "elapsed_seconds": elapsed,
+            "evaluations_per_second": rate,
+            "execution": execution,
             "failure": str(failure_path) if failure_path else None,
         },
     )
-    logger.info("{}: {} evaluations, seed={}, search={}", outcome, count, seed, search_state)
+    logger.info(
+        "{}: {} evaluations, seed={}, search={}, {:.2f} evaluations/s",
+        outcome,
+        count,
+        seed,
+        search_state,
+        rate,
+    )
     return 1 if first is not None else (0 if complete else 2)
 
 
@@ -438,7 +475,7 @@ def _profile_benchmark(
 def benchmark(
     config: Config,
     *,
-    sizes: list[int],
+    sizes: list[int] | None = None,
     repeat: int,
     seed: int,
     pattern: str = "default",
@@ -446,6 +483,15 @@ def benchmark(
     profile_timeout: float = 10.0,
 ) -> int:
     script = _profile_command(config) if profile else None
+    source = (
+        "--sizes"
+        if sizes is not None
+        else ("constraints.toml" if (config.root / "constraints.toml").exists() else "fallback")
+    )
+    sizes = choose_benchmark_sizes(config.root, sizes)
+    logger.info("Benchmark sizes ({}): {}", source, ", ".join(map(str, sizes)))
+    if source == "fallback":
+        logger.info("No constraints.toml; use --sizes to cover this problem's official bounds")
     session = new_session(config, "bench")
     rows = []
     failed = False
@@ -515,6 +561,8 @@ def benchmark(
         session / "summary.json",
         {
             "seed": seed,
+            "sizes": sizes,
+            "sizes_source": source,
             "rows": rows,
             "checks_correctness": False,
             "pattern": pattern,

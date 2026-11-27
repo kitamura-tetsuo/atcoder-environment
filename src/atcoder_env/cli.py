@@ -125,10 +125,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Search wall budget in seconds; a running case may finish after this",
     )
     search.add_argument("--no-shrink", action="store_true")
+    search.add_argument(
+        "--sequential",
+        action="store_true",
+        help="Run the oracle and solution sequentially instead of concurrently",
+    )
     bench = problem_command(
         "bench", "Measure increasing input sizes; does not check correctness", run_options=True
     )
-    bench.add_argument("--sizes", type=sizes_list, default=[100, 1000, 10000])
+    bench.add_argument(
+        "--sizes",
+        type=sizes_list,
+        help="Comma-separated sizes (default: official bounds and powers of ten from constraints.toml)",
+    )
     bench.add_argument("--repeat", type=positive_int, default=3)
     bench.add_argument("--seed", type=int)
     bench.add_argument(
@@ -286,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
                 seed=args.seed if args.seed is not None else config.seed,
                 shrink=not args.no_shrink,
                 budget=args.budget,
+                parallel=not args.sequential,
             )
         if args.action == "bench":
             return benchmark(
