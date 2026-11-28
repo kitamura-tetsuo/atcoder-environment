@@ -13,6 +13,7 @@ from uuid import uuid4
 from loguru import logger
 
 from atcoder_env.config import Config
+from atcoder_env.judge_runtime import judge_runtime_status
 from atcoder_env.runner import RunResult
 
 
@@ -57,6 +58,7 @@ def new_session(config: Config, kind: str) -> Path:
         {
             "created_at": datetime.now(UTC).isoformat(),
             "python": sys.version,
+            "judge_runtime": judge_runtime_status(),
             "package_versions": {
                 name: importlib.metadata.version(name)
                 for name in (
