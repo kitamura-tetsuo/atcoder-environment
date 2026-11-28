@@ -7,7 +7,7 @@ from contextlib import suppress
 from threading import Event
 from typing import Self
 
-from atcoder_env.config import Config
+from atcoder_env.config import Config, stress_memory_limits
 from atcoder_env.runner import RunResult, run_program
 
 
@@ -47,7 +47,7 @@ class PairedRunner:
             cwd=config.root,
             timeout=config.oracle_timeout if oracle else config.timeout,
             output_limit=config.output_limit,
-            memory_limit_mib=None if oracle else config.memory_limit_mib,
+            memory_limit_mib=stress_memory_limits(config)[int(oracle)],
             cancel_event=cancel_event,
         )
 

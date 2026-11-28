@@ -498,7 +498,7 @@ CSVには起動を含む時間の最小値・中央値・最大値と `max_rss_k
 
 メモリ上限は観測後にプロセス群を停止する仕組みで、カーネルが割り当てそのものを拒否する隔離ではありません。急な割り当てでは設定値を超えてから停止する場合があります。`MemoryError` や `SIGKILL` という理由だけで、観測していないメモリ超過をMLEとは判定しません。必要ならDocker自体にもメモリ上限を設定してください。
 
-`[run] memory_limit_mib = 512` と設定するか、`ac run` / `ac test` / `ac stress` / `ac replay` に `--memory-limit 512` を付けると、その解答プロセスにも同じ計測・上限を適用できます。参照解には適用しません。
+`[run] memory_limit_mib = 512` と設定するか、`ac run` / `ac test` / `ac stress` / `ac replay` に `--memory-limit 512` を付けると、その解答プロセスにも同じ計測・上限を適用できます。stress では未指定でも解答に512 MiB、参照解にその4倍（既定2048 MiB）を適用します。参照解の時間は既定30秒です。個別に `--oracle-timeout 60 --oracle-memory-limit 1024` または `[run] oracle_timeout` / `oracle_memory_limit_mib` で変更できます。参照解の上限超過は ORACLE_MLE として入力を保存し、探索を停止します。RSSのサンプリングによる監視なので、急激な割り当てを完全には防げません。
 
 #### Hypothesisによる資源超過の縮小
 
@@ -593,7 +593,7 @@ url = "https://atcoder.jp/contests/abs/tasks/abc086_a"
 solution = ["python", "main.py"]
 oracle = ["python", "brute.py"]
 timeout = 2.0
-oracle_timeout = 5.0
+oracle_timeout = 30.0
 output_limit = 1048576
 comparison = "tokens"
 atol = 1e-9
