@@ -135,7 +135,7 @@ def test_bug_is_shrunk_saved_replayed_and_promoted(workspace):
 )
 def test_invalid_oracle_is_error_instead_of_solution_wa(workspace, oracle_code, expected_status):
     workspace.oracle = [sys.executable, "-c", oracle_code]
-    workspace.oracle_timeout = 0.1
+    workspace.oracle_timeout = 1.0 if expected_status == "ORACLE_RE" else 0.1
     with pytest.raises(OracleFailure, match=expected_status):
         stress(workspace, max_examples=15, seed=11, budget=5)
     session = latest_session(workspace, "stress")

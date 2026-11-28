@@ -9,6 +9,7 @@ import re
 import sys
 import time
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType
 from uuid import uuid4
@@ -19,7 +20,7 @@ from loguru import logger
 
 from atcoder_env.artifacts import new_session, save_case, write_json
 from atcoder_env.benchmark import benchmark as benchmark
-from atcoder_env.config import Config
+from atcoder_env.config import Config, stress_memory_limits
 from atcoder_env.paired_runner import PairedRunner
 from atcoder_env.runner import RunResult, run_program, verdict
 from atcoder_env.workspace import require_configured_generator
@@ -77,7 +78,7 @@ def execute(config: Config, data: str, *, oracle: bool = False) -> RunResult:
         cwd=config.root,
         timeout=config.oracle_timeout if oracle else config.timeout,
         output_limit=config.output_limit,
-        memory_limit_mib=None if oracle else config.memory_limit_mib,
+        memory_limit_mib=stress_memory_limits(config)[1] if oracle else config.memory_limit_mib,
     )
 
 
@@ -141,6 +142,17 @@ def stress(
     parallel: bool = True,
 ) -> int:
     require_configured_generator(config.root / "cases.py")
+    solution_memory, oracle_memory = stress_memory_limits(config)
+    config = replace(
+        config, memory_limit_mib=solution_memory, oracle_memory_limit_mib=oracle_memory
+    )
+    logger.info(
+        "Stress limits: solution {}s / {} MiB; oracle {}s / {} MiB",
+        config.timeout,
+        solution_memory,
+        config.oracle_timeout,
+        oracle_memory,
+    )
     session = new_session(config, "stress")
     started = time.monotonic()
     count = 0
@@ -280,9 +292,31 @@ def stress(
         data, actual, oracle, status = latest
         # Budget and explicit-edge failures need the same reproduction check as shrinking.
         checked_oracle = execute(config, data, oracle=True)
+        execution["oracle_seconds"] += checked_oracle.elapsed_seconds
+        if checked_oracle.status != "ok":
+            status = "ORACLE_" + judge(config, checked_oracle, "")
+            save_case(
+                session,
+                "oracle-error",
+                input_data=data,
+                actual=checked_oracle,
+                oracle=checked_oracle,
+                verdict=status,
+                details={"stage": "confirmation"},
+            )
+            write_json(
+                session / "summary.json",
+                {
+                    "status": "ERROR",
+                    "error": status,
+                    "evaluations": count + 1,
+                    "seed": seed,
+                    "execution": execution,
+                },
+            )
+            raise OracleFailure(f"Oracle failed ({status}); see {session / 'oracle-error'}")
         checked_actual = execute(config, data)
         execution["solution_seconds"] += checked_actual.elapsed_seconds
-        execution["oracle_seconds"] += checked_oracle.elapsed_seconds
         count += 1
         checked_status = judge(config, checked_actual, checked_oracle.stdout)
         if (

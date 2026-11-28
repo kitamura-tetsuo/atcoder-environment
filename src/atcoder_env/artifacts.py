@@ -78,6 +78,7 @@ def new_session(config: Config, kind: str) -> Path:
             "oracle": config.oracle,
             "timeout": config.timeout,
             "oracle_timeout": config.oracle_timeout,
+            "oracle_memory_limit_mib": config.oracle_memory_limit_mib,
             "output_limit": config.output_limit,
             "memory_limit_mib": config.memory_limit_mib,
             "comparison": config.comparison,

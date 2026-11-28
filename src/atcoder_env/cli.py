@@ -116,7 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
                 "--memory-limit",
                 type=positive_int,
                 metavar="MiB",
-                help="Resident memory limit in MiB (bench default: 512)",
+                help="Resident memory limit in MiB (stress/bench default: 512)",
             )
         return command
 
@@ -125,7 +125,15 @@ def build_parser() -> argparse.ArgumentParser:
         "stress", "Compare against a brute-force oracle and shrink a failure", run_options=True
     )
     search.add_argument("--oracle", help="Oracle command override")
-    search.add_argument("--oracle-timeout", type=positive_float)
+    search.add_argument(
+        "--oracle-timeout", type=positive_float, help="Oracle wall timeout (default: 30s)"
+    )
+    search.add_argument(
+        "--oracle-memory-limit",
+        type=positive_int,
+        metavar="MiB",
+        help="Oracle RSS limit (default: four times the solution limit)",
+    )
     search.add_argument("--max-examples", type=positive_int)
     search.add_argument("--seed", type=int)
     search.add_argument(
@@ -327,6 +335,8 @@ def main(argv: list[str] | None = None) -> int:
                 setattr(config, option, value)
         if getattr(args, "memory_limit", None) is not None:
             config.memory_limit_mib = args.memory_limit
+        if getattr(args, "oracle_memory_limit", None) is not None:
+            config.oracle_memory_limit_mib = args.oracle_memory_limit
         validate_config(config)
         if args.action == "test":
             return test_samples(config)

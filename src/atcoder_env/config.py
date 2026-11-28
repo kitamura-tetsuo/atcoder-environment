@@ -17,14 +17,22 @@ class Config:
     solution: list[str] = field(default_factory=lambda: [sys.executable, "main.py"])
     oracle: list[str] = field(default_factory=lambda: [sys.executable, "brute.py"])
     timeout: float = 2.0
-    oracle_timeout: float = 5.0
+    oracle_timeout: float = 30.0
     output_limit: int = 1_048_576
     memory_limit_mib: int | None = None
+    oracle_memory_limit_mib: int | None = None
     comparison: str = "tokens"
     atol: float = 1e-9
     rtol: float = 1e-9
     examples: int = 200
     seed: int = 0
+
+
+def stress_memory_limits(config: Config) -> tuple[int, int]:
+    """Resolve the solution cap and the more generous oracle cap."""
+    solution = config.memory_limit_mib or 512
+    oracle = config.oracle_memory_limit_mib or 4 * solution
+    return solution, oracle
 
 
 def command_args(value: str | list[str]) -> list[str]:
@@ -54,6 +62,7 @@ def load_config(path: Path) -> Config:
                 "oracle_timeout",
                 "output_limit",
                 "memory_limit_mib",
+                "oracle_memory_limit_mib",
                 "comparison",
                 "atol",
                 "rtol",
@@ -88,10 +97,10 @@ def validate_config(config: Config) -> None:
         value = getattr(config, name)
         if type(value) is not int or value < 1:
             raise ValueError(f"{name} must be a positive integer")
-    if config.memory_limit_mib is not None and (
-        type(config.memory_limit_mib) is not int or config.memory_limit_mib <= 0
-    ):
-        raise ValueError("memory_limit_mib must be a positive integer")
+    for name in ("memory_limit_mib", "oracle_memory_limit_mib"):
+        value = getattr(config, name)
+        if value is not None and (type(value) is not int or value <= 0):
+            raise ValueError(f"{name} must be a positive integer")
     if type(config.seed) is not int:
         raise ValueError("seed must be an integer")
     if config.comparison not in {"tokens", "exact", "float"}:
