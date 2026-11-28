@@ -28,6 +28,19 @@ PythonでAtCoderに取り組むための、問題準備・サンプル実行・�
 
 実行時に生成AIを呼ぶ機能はありません。問題固有の解答と正しい愚直解は自分で記述します。入力制約は対応する形式または確認済みの問題なら自動で取り込み、未対応の場合は手動で記述します。AHCでは公式生成済み入力を利用できます。
 
+## AtCoderのPython環境に合わせる
+
+[公式のCPythonインストールスクリプト（2025年10月言語更新）](https://img.atcoder.jp/file/language-update/2025-10/082-3-13_cpython.toml) に基づき、CPython 3.13.7 と公式43ライブラリ（42件のバージョン指定、1件のGitコミット指定）を固定しています。`pyproject.toml` の `judge` グループを既定でインストールし、`uv.lock` で依存関係を解決済みの版に固定します。
+
+- NumPy 2.2.6、SciPy 1.16.1、PuLP 3.2.2、pandas 2.3.2、Numba 0.61.2、PyTorch 2.8.0+cpu など。
+- `ac-library-python` は公式のGitコミットに固定。PyTorchは公式CPU版の配布元を使用。
+- Hypothesis、oj、line_profilerなどのローカル検証ツールは別の依存定義で管理し、同じ仮想環境にインストールします。公式ライブラリと重複する依存関係のバージョンは統一します。ローカル専用ライブラリが提出先で利用できるという意味ではありません。
+- `ac doctor` はCPythonの版、公式ライブラリのインストール版、Gitコミットを検証します。実行ログの `environment.json` にも結果を保存します。
+
+Pythonの最適化ビルド、OS、CPUなどは本番と同一ではありません。Numbaは同バージョンの通常のPyPI配布版であり、公式環境独自のCUDA削除パッチは適用していません。PyPyおよびCodonの環境はこの設定の対象外です。PuLP 3.2.2 は内部の `pulp.__version__` が古い値を返すため、インストール版は `importlib.metadata.version("PuLP")` で確認します。
+
+既存のDev Containerを更新するには **Dev Containers: Rebuild Container** を実行してください。Pythonのバージョンが変わるため、単なる `git pull` では既存コンテナーのインタープリターは更新されません。
+
 ## まず動かす：Docker Compose
 
 Docker EngineとCompose v2が使えるLinuxを想定しています。
@@ -112,7 +125,7 @@ Dev Container では設定済みの `/opt/venv/bin/python`、ローカルでは 
 
 ## Dockerを使わない場合
 
-Linux/macOS、Python 3.11〜3.13、[uv](https://docs.astral.sh/uv/getting-started/installation/) が必要です。標準はPython 3.12です。
+Linux x86_64、CPython 3.13.7、[uv](https://docs.astral.sh/uv/getting-started/installation/) が必要です。その他のOS・アーキテクチャでは同じLinux x86_64のDocker環境を利用してください。
 
 ```bash
  uv sync --frozen
@@ -638,7 +651,7 @@ AtCoderの認証方式とojの互換性には[既知の問題](https://github.co
  uv run --frozen pytest
 ```
 
-CIではPython 3.11 / 3.12 / 3.13、Docker Compose、実際の子プロセスによる異常系、意図的なWAの検出・縮小を確認します。外部サイトに依存するダウンロードと実際の提出はCIで実行しません。
+CIではAtCoderと同じCPython 3.13.7、Docker Compose、実際の子プロセスによる異常系、意図的なWAの検出・縮小を確認します。外部サイトに依存するダウンロードと実際の提出はCIで実行しません。
 
 依存関係は `uv.lock` に固定しています。古いojの `distutils` 依存がPython 3.12以降でも起動するよう、互換性を提供するsetuptoolsも明示的に固定しています。
 

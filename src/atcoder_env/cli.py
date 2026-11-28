@@ -32,6 +32,7 @@ from atcoder_env.harness import (
     stress,
     test_samples,
 )
+from atcoder_env.judge_runtime import check_judge_runtime
 from atcoder_env.official_corpus import is_heuristic
 from atcoder_env.runner import run_program
 from atcoder_env.workspace import create_workspace, resolve_workspace
@@ -218,6 +219,7 @@ def doctor() -> int:
     logger.info("Python: {} ({})", sys.version.split()[0], sys.executable)
     if os.name != "posix":
         raise ValueError("The execution runner requires Linux/macOS. Use Docker or WSL on Windows.")
+    check_judge_runtime()
     for package in (
         "atcoder-environment",
         "hypothesis",
@@ -239,7 +241,7 @@ def doctor() -> int:
             raise ValueError(f"{tool} could not start: {result.stderr}")
         logger.info("{}: starts successfully", tool)
     logger.info(
-        "Offline environment is ready. Network login and AtCoder judge compatibility are separate checks."
+        "Offline environment is ready. Network login and exact judge build compatibility are separate checks."
     )
     return 0
 
